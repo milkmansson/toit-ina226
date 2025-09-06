@@ -1,4 +1,6 @@
-//
+// Copyright (C) 2025 Ian ...
+// Use of this source code is governed by an MIT-style license that can be
+// found in the package's LICENSE file.
 // Toit Driver Library for an INA226 module, DC Shunt current and power sensor
 // Module not unlike this: https://esphome.io/components/sensor/ina226/
 //
