@@ -125,7 +125,7 @@ class Driver:
   last-measure-mode_/int                 := MODE-CONTINUOUS
   current-LSB_/float                     := 0.0
   shunt-resistor_/float                  := 0.0
-  correction-factor-a_/float                     := 0.0
+  correction-factor-a_/float             := 0.0
 
   constructor dev/serial.Device --debug/bool=false:
     reg_ = dev.registers
@@ -140,9 +140,7 @@ class Driver:
   // CONFIGURATION FUNCTIONS
 
   // Initial Device Configuration
-  //
   initialise-device_ -> none:
-    // reset/initialise module
     reset_
 
     // NOTE:  Found an error by factor 100 and couldn't figure this out in any way
@@ -159,9 +157,9 @@ class Driver:
     // calibration-value --value=DEFAULT-CALIBRATION-VALUE
 
     // Initialise Default sampling, conversion timing, and measuring mode
-    sampling-rate       --rate=AVERAGE-512-SAMPLES
-    conversion-time     --time=TIMING-1100-US
-    measure-mode        --mode=MODE-CONTINUOUS
+    sampling-rate --rate=AVERAGE-512-SAMPLES
+    conversion-time --time=TIMING-1100-US
+    measure-mode --mode=MODE-CONTINUOUS
 
     // Set Defaults for Resistor Range
     // NOTE:  There appears to have been originally two constants/values for 'current range'
@@ -169,7 +167,7 @@ class Driver:
     //        current range is set to 0.800a - eg 800ma.
     // NOTE:  Whilst not documented well for newbies like me, I assumed the resistor value
     //        needs to match the one on the board.  Mine is R100, which I assumed 0.1 Ohm.
-    resistor-range      --resistor=0.100 --current-range=0.8
+    resistor-range --resistor=0.100 --current-range=0.8
     
     // NOTE:  Performing a single measurement here assists with accuracy for initial
     //        measurements.
@@ -214,7 +212,6 @@ class Driver:
 
   // Reset Device
   // NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears
-  // 
   reset_ -> none:
     oldMask := reg_.read-u16-be REGISTER-CONFIG_
     newMask := oldMask | CONF-RESET-MASK_
@@ -224,10 +221,8 @@ class Driver:
     if debug_: print "*      : reset - 0x$(%02x oldMask) [to 0x$(%02x newMask)] - after reset 0x$(%02x nowMask)"
 
   // Set Calibration Value 
-  // NOTE:  Sets Calibration Value Outright
-  // 
+  // NOTE:  Replaces calibration value outright
   calibration-value --value/int -> none:
-    // Replaces the existing calibration value 
     oldRegister := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
     if debug_: print "*      : calibration-value         changed from $(oldRegister) to $(value)"
