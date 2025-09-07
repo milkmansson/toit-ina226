@@ -568,14 +568,7 @@ class Driver:
   //        (more reads) whereas without debug mode, one read would suffice.
   alert -> bool:
     if debug_: 
-      if overflow-alert:
-        return true
-      else if limit-alert:
-        return true
-      else if conversion-ready-alert:
-        return true
-      else:
-        return false
+      return overflow-alert or limit-alert or conversion-ready-alert
     else:
       register/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
       checkMask    := INA226-ALERT-MATH-OVERFLOW-FLAG | INA226-ALERT-FUNCTION-FLAG | INA226-ALERT-CONVERSION-READY-FLAG
