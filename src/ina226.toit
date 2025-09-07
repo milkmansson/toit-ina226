@@ -127,21 +127,16 @@ class Driver:
   shunt-resistor_/float                  := 0.0
   correction-factor-a_/float                     := 0.0
 
+  constructor dev/serial.Device --debug/bool=false:
+    reg_ = dev.registers
+    initialise-device_
+  
   debug-mode --enable -> none:
     debug_ = true
 
   debug-mode --disable -> none:
     debug_ = false
 
-  constructor dev/serial.Device:
-    reg_ = dev.registers
-    initialise-device_
-
-  constructor dev/serial.Device --debug:
-    reg_ = dev.registers
-    debug-mode --enable
-    initialise-device_
-  
   // CONFIGURATION FUNCTIONS
 
   // Initial Device Configuration
