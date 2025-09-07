@@ -56,14 +56,14 @@ AVERAGE-512-SAMPLES                      ::= 0x0006
 AVERAGE-1024-SAMPLES                     ::= 0x0007
 
 // BVCT and SVCT conversion timing ENUM
-TIMING-140-us                            ::= 0x0000
-TIMING-204-us                            ::= 0x0001
-TIMING-332-us                            ::= 0x0002
-TIMING-588-us                            ::= 0x0003
-TIMING-1100-us                           ::= 0x0004
-TIMING-2100-us                           ::= 0x0005
-TIMING-4200-us                           ::= 0x0006
-TIMING-8300-us                           ::= 0x0007
+TIMING-140-US                            ::= 0x0000
+TIMING-204-US                            ::= 0x0001
+TIMING-332-US                            ::= 0x0002
+TIMING-588-US                            ::= 0x0003
+TIMING-1100-US                           ::= 0x0004
+TIMING-2100-US                           ::= 0x0005
+TIMING-4200-US                           ::= 0x0006
+TIMING-8300-US                           ::= 0x0007
 
 // 'Measure Mode' (includes OFF)
 MODE-POWER-DOWN                          ::= 0x0000
@@ -170,7 +170,7 @@ class Driver:
 
     // Initialise Default sampling, conversion timing, and measuring mode
     sampling-rate       --rate=AVERAGE-512-SAMPLES
-    conversion-time     --time=TIMING-1100-us
+    conversion-time     --time=TIMING-1100-US
     measure-mode        --mode=MODE-CONTINUOUS
 
     // Set Defaults for Resistor Range
@@ -628,7 +628,7 @@ class Driver:
   conversion-ready --disable-alert-pin -> none:
     conversion-ready --set=0
 
-  // Returns microsecs for TIMING-x-us statics 0..7
+  // Returns microsecs for TIMING-x-US statics 0..7
   // NOTE:  A helper function
   conversion-time-us-from-enum --code/int -> int:
     assert: 0 <= code <= 7
