@@ -118,18 +118,14 @@ class Driver:
   static CONVERSION-READY-OFFSET_        ::= 10
   static CONVERSION-READY-LENGTH_        ::= 1
 
-
-
-  // Globals
-  debug_/bool                := false
-  reg_/registers.Registers   := ?
-  
-  currentDivider_mA_/float   := 0.0
-  pwrMultiplier_mW_/float    := 0.0
-  lastMeasureMode_/int       := MODE-CONTINUOUS
-  current-LSB_/float         := 0.0
-  shuntResistor_/float       := 0.0
-  corrFactorA_/float         := 0.0
+  debug_/bool                            := false
+  reg_/registers.Registers               := ?  
+  currentDivider_mA_/float               := 0.0
+  pwrMultiplier_mW_/float                := 0.0
+  lastMeasureMode_/int                   := MODE-CONTINUOUS
+  current-LSB_/float                     := 0.0
+  shuntResistor_/float                   := 0.0
+  corrFactorA_/float                     := 0.0
 
   debug-mode --enable -> none:
     debug_ = true
@@ -137,7 +133,6 @@ class Driver:
   debug-mode --disable -> none:
     debug_ = false
 
-  // Class Constructor
   constructor dev/serial.Device:
     reg_ = dev.registers
     initialise-device_
