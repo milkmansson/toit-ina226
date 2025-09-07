@@ -726,7 +726,7 @@ class Driver:
   // Die Revision ID Bits
   // NOTE:  Bit 0-3 Stores the device revision identification bits
   //
-  die-id --rid -> int:
+  device-revision -> int:
     register := reg_.read-u16-be INA226-REGISTER-DIE-ID_
     dieidRid := (register & INA226-DIE-ID-RID-MASK)
     if debug_: print "*      : die-id RID is      0x$(%04x dieidRid) [$(dieidRid)]"
