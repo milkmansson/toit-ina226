@@ -1,4 +1,4 @@
-// Copyright (C) 2025 Ian ...
+// Copyright (C) 2025 Ian
 // Use of this source code is governed by an MIT-style license that can be
 // found in the package's LICENSE file.
 // Toit Driver Library for an INA226 module, DC Shunt current and power sensor
@@ -14,6 +14,13 @@
 // Qdos: Other code reviewed whilst working this out:
 // https://github.com/RobTillaart/INA226/blob/master/INA226.cpp
 //
+
+
+/** 
+
+$DEFAULT-I2C-ADDRESS ($ hotlinks to code location!)  Used for parameters
+
+*/
 
 import binary
 import serial.device as serial
@@ -160,8 +167,9 @@ class Driver:
     reset_
 
     // NOTE:  Found an error by factor 100 and couldn't figure this out in any way
-    //        left this hack in for now to ensure values match up with voltmeter.
-    //        before using the library, verify this value matches A measurements IRL. 
+    //        left this hack (feature) in to allow a correction factor for values 
+    //        match up with voltmeter. Before using the library, verify this value
+    //        matches measurements IRL. 
     corrFactorA_ = 100.0
 
     // NOTE:  The Current Register (04h) and Power Register (03h) default to '0' 
