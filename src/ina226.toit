@@ -120,12 +120,12 @@ class Driver:
 
   debug_/bool                            := false
   reg_/registers.Registers               := ?  
-  currentDivider_mA_/float               := 0.0
-  pwrMultiplier_mW_/float                := 0.0
-  lastMeasureMode_/int                   := MODE-CONTINUOUS
+  current-divider-ma_/float              := 0.0
+  power-multiplier-mw_/float             := 0.0
+  last-measure-mode_/int                 := MODE-CONTINUOUS
   current-LSB_/float                     := 0.0
-  shuntResistor_/float                   := 0.0
-  corrFactorA_/float                     := 0.0
+  shunt-resistor_/float                  := 0.0
+  correction-factor-a_/float                     := 0.0
 
   debug-mode --enable -> none:
     debug_ = true
@@ -154,7 +154,7 @@ class Driver:
     //        left this hack (feature) in to allow a correction factor for values 
     //        match up with voltmeter. Before using the library, verify this value
     //        matches measurements IRL. 
-    corrFactorA_ = 100.0
+    correction-factor-a_ = 100.0
 
     // NOTE:  The Current Register (04h) and Power Register (03h) default to '0' 
     //        because the Calibration register defaults to '0', yielding zero current
@@ -318,27 +318,27 @@ class Driver:
     newMask     |= mode  //low value, no left shift offset
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     if debug_: print "*      : measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
-    if (mode != MODE-POWER-DOWN): lastMeasureMode_ = mode
+    if (mode != MODE-POWER-DOWN): last-measure-mode_ = mode
 
   // Set resistor and current range, independently 
   // NOTE:  Resistor value in ohm, Current range in A
   // 
   resistor-range --resistor/float --current-range/float -> none:
-    shuntResistor_       = resistor    // Cache to global for later use
-    current-LSB_         = current_range / 32768.0                // A per bit (LSB)
+    shunt-resistor_        = resistor    // Cache to global for later use
+    current-LSB_           = current_range / 32768.0                // A per bit (LSB)
     if debug_: print "*      : resistor-range: current per bit = $(current-LSB_)A"
     calibrationValue   := 0.00512 / (current-LSB_ * resistor)
     if debug_: print "*      : resistor-range: calibration value becomes = $(calibrationValue)"
     calibration-value --value=(calibrationValue).to-int
-    currentDivider_mA_  = 0.001 / current-LSB_
-    pwrMultiplier_mW_   = 1000.0 * 25.0 * current-LSB_
+    current-divider_ma_    = 0.001 / current-LSB_
+    power-multiplier_mw_   = 1000.0 * 25.0 * current-LSB_
     // TODO: Check for accuracy on the to-int
   
   // MEASUREMENT FUNCTIONS
 
   shunt-current --amps -> float:
     register   := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
-    return (register * current-LSB_ * corrFactorA_)
+    return (register * current-LSB_ * correction-factor-a_)
   
   shunt-current --milliamps -> float:   return ((shunt-current --amps) * 1000.0)
 
@@ -373,7 +373,7 @@ class Driver:
   load-power --milliwatts -> float:
     // Using the cached multiplier [pwrMultiplier_mW_ = 1000 * 25 * current-LSB_]
     register := reg_.read-u16-be REGISTER-LOAD-POWER_
-    return (register * pwrMultiplier_mW_).to-float
+    return (register * power-multiplier-mw_).to-float
 
   load-power --watts -> float:
     return (load-power --milliwatts) / 1000.0
@@ -390,7 +390,7 @@ class Driver:
   power-down -> none:
     measure-mode --mode=MODE-POWER-DOWN
   power-up -> none:
-    measure-mode --mode=lastMeasureMode_
+    measure-mode --mode=last-measure-mode_
     sleep --ms=(estimated-conversion-time --ms)
 
   // Returns true if conversion is still ongoing
@@ -445,16 +445,16 @@ class Driver:
       alertLimit = limit * 400
     else if type == ALERT-CURRENT-OVER:
       type = ALERT-SHUNT-OVER-VOLTAGE
-      alertLimit = limit * 2048 * currentDivider_mA_ / (calibration-value).to-float
+      alertLimit = limit * 2048 * current-divider-ma_ / (calibration-value).to-float
     else if type == ALERT-CURRENT-UNDER:
       type = ALERT-SHUNT-UNDER-VOLTAGE
-      alertLimit = limit * 2048 * currentDivider_mA_ / (calibration-value).to-float
+      alertLimit = limit * 2048 * current-divider-ma_ / (calibration-value).to-float
     else if type == ALERT-BUS-OVER-VOLTAGE:
       alertLimit = limit * 800
     else if type == ALERT-BUS-UNDER-VOLTAGE:
       alertLimit = limit * 800
     else if type == ALERT-POWER-OVER:
-      alertLimit = limit / pwrMultiplier_mW_
+      alertLimit = limit / power-multiplier-mw_
     else:
       if debug_: print "*      : set-alert unexpected alert type"
       throw "set-alert unexpected alert type"
@@ -816,9 +816,9 @@ class Driver:
 
     calibrationValue/int             := calibration-value
     currentRaw/int                   := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
-    leastSignificantBit/float        := 0.00512 / (calibrationValue.to-float * shuntResistor_)
+    leastSignificantBit/float        := 0.00512 / (calibrationValue.to-float * shunt-resistor_)
     currentChip/float                := currentRaw * leastSignificantBit
-    currentVR/float                  := shuntVoltage / shuntResistor_
+    currentVR/float                  := shuntVoltage / shunt-resistor_
 
     // CROSSCHECK: between chip/measured current and V/R reconstructed current
     currentDifference/float          := (currentChip - currentVR).abs
@@ -827,7 +827,7 @@ class Driver:
       currentDifferencePct           = (currentDifference / currentVR) * 100.0
 
     // CROSSCHECK: shunt voltage (measured vs reconstructed)
-    shuntVoltageCalculated/float     := currentChip * shuntResistor_
+    shuntVoltageCalculated/float     := currentChip * shunt-resistor_
     shuntVoltageDifference/float     := (shuntVoltage - shuntVoltageCalculated).abs
     shuntVoltageDifferencePct/float  := 0.0
     if (shuntVoltage != 0.0): 
@@ -835,7 +835,7 @@ class Driver:
 
     print "DIAG :"
     print "    ----------------------------------------------------------"
-    print "    Shunt Resistor    =  $(%0.8f shuntResistor_) Ohm (Configured in code)"
+    print "    Shunt Resistor    =  $(%0.8f shunt-resistor_) Ohm (Configured in code)"
     print "    Vload    (IN-)    =  $(%0.8f loadVoltage)  V"
     print "    Vsupply  (IN+)    =  $(%0.8f supplyVoltage)  V"
     print "    Shunt V delta     =  $(%0.8f shuntVoltageDelta)  V"
