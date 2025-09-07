@@ -32,7 +32,7 @@ DEFAULT-I2C-ADDRESS                   ::= 0x0040 // 64 appears to be the default
                                             // with jumpers valid values to 79
                                             // See table 6-2
 
-// Alert Types that can set off the pin
+// Alert Types that can set off the pin.
 INA226-ALERT-SHUNT-OVER-VOLTAGE       ::= 0x8000
 INA226-ALERT-SHUNT-UNDER-VOLTAGE      ::= 0x4000
 INA226-ALERT-BUS-OVER-VOLTAGE         ::= 0x2000
