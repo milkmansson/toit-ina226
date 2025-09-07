@@ -213,22 +213,25 @@ class Driver:
   // Reset Device
   // NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears
   reset_ -> none:
-    oldMask := reg_.read-u16-be REGISTER-CONFIG_
-    newMask := oldMask | CONF-RESET-MASK_
-    reg_.write-u16-be REGISTER-CONFIG_ newMask
+    old-value := reg_.read-u16-be REGISTER-CONFIG_
+    new-value := old-value | CONF-RESET-MASK_
+    reg_.write-u16-be REGISTER-CONFIG_ new-value
     sleep --ms=(estimated-conversion-time --ms)
-    nowMask := reg_.read-u16-be REGISTER-CONFIG_
-    if debug_: print "*      : reset - 0x$(%02x oldMask) [to 0x$(%02x newMask)] - after reset 0x$(%02x nowMask)"
+    if debug_:
+       after-value := reg_.read-u16-be REGISTER-CONFIG_
+       print "*      : reset - 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
 
   // Set Calibration Value 
   // NOTE:  Replaces calibration value outright
   calibration-value --value/int -> none:
-    oldRegister := reg_.read-u16-be REGISTER-CALIBRATION_
+    assert: ((value >= 1500) and (value <= 3000))  // sanity check
+    old-value := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
-    if debug_: print "*      : calibration-value         changed from $(oldRegister) to $(value)"
-    calCheck/int := calibration-value
-    if debug_: print "*      : calibration-value CHECKED changed from $(oldRegister) to $(calCheck)"
-    assert: ((calCheck >= 1500) and (calCheck <= 3000))  // sanity check
+    if debug_: 
+      print "*      : calibration-value         changed from $(old-value) to $(value)"
+      checked-value/int := calibration-value
+      print "*      : calibration-value CHECKED changed from $(old-value) to $(checked-value)"
+
 
   // Get Calibration Value
   //
