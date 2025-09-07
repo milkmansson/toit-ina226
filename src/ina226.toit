@@ -1,3 +1,7 @@
+import binary
+import serial.device as serial
+import serial.registers as registers
+
 // Copyright (C) 2025 Ian
 // Use of this source code is governed by an MIT-style license that can be
 // found in the package's LICENSE file.
@@ -20,16 +24,12 @@
   ******************************************************************/
 
 
-
 /** 
 
 $DEFAULT-I2C-ADDRESS ($ hotlinks to code location!)  Used for parameters
 
 */
 
-import binary
-import serial.device as serial
-import serial.registers as registers
 
 // DEFAULT-I2C-ADDRESS is 64 with jumper defaults.
 // Valid address values: 64 to 79 - See datasheet table 6-2
