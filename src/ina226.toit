@@ -8,8 +8,7 @@
 //          by Wolfgang Ewald <WEwald@gmx.de> originally published on Github
 //          here https://github.com/wollewald/INA226_WE  
 //
-// TI Module Datasheet:
-// https://www.ti.com/lit/ds/symlink/ina226.pdf
+// TI Module Datasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf
 //
 // Qdos: Other code reviewed whilst working this out:
 // https://github.com/RobTillaart/INA226/blob/master/INA226.cpp
