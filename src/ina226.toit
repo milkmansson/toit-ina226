@@ -28,9 +28,9 @@ import serial.registers as registers
 
 //DEFAULT-CALIBRATION-VALUE             ::= 0x0800
 //DEFAULT-CALIBRATION-VALUE             ::= 0x0831 // calculated during testing 2025-09-05
-DEFAULT-I2C-ADDRESS                   ::= 0x0040 // 64 appears to be the default
-                                            // with jumpers valid values to 79
-                                            // See table 6-2
+// 64 appears to be the default with jumpers valid values to 79
+// See table 6-2
+DEFAULT-I2C-ADDRESS                   ::= 0x0040
 
 // Alert Types that can set off the pin.
 INA226-ALERT-SHUNT-OVER-VOLTAGE       ::= 0x8000
