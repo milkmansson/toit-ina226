@@ -14,6 +14,12 @@
 // Qdos: Other code reviewed whilst working this out:
 // https://github.com/RobTillaart/INA226/blob/master/INA226.cpp
 //
+  /*****************************************************************
+  * Written by Wolfgang (Wolle) Ewald
+  * https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor (English)
+  * https://wolles-elektronikkiste.de/ina226 (German)
+  ******************************************************************/
+
 
 
 /** 
@@ -26,110 +32,96 @@ import binary
 import serial.device as serial
 import serial.registers as registers
 
-//DEFAULT-CALIBRATION-VALUE             ::= 0x0800
-//DEFAULT-CALIBRATION-VALUE             ::= 0x0831 // calculated during testing 2025-09-05
-// 64 appears to be the default with jumpers valid values to 79
-// See table 6-2
-DEFAULT-I2C-ADDRESS                   ::= 0x0040
+// DEFAULT-I2C-ADDRESS is 64 with jumper defaults.
+// Valid address values: 64 to 79 - See datasheet table 6-2
+DEFAULT-I2C-ADDRESS                      ::= 0x40
 
-// Alert Types that can set off the pin.
-INA226-ALERT-SHUNT-OVER-VOLTAGE       ::= 0x8000
-INA226-ALERT-SHUNT-UNDER-VOLTAGE      ::= 0x4000
-INA226-ALERT-BUS-OVER-VOLTAGE         ::= 0x2000
-INA226-ALERT-BUS-UNDER-VOLTAGE        ::= 0x1000
-INA226-ALERT-POWER-OVER               ::= 0x0800
-INA226-ALERT-CURRENT-OVER             ::= 0xFFFE
-INA226-ALERT-CURRENT-UNDER            ::= 0xFFFF
-INA226-ALERT-CONVERSION-READY         ::= 0x0400
+// Constants to be used by users during configuration
 
-//  returned by getAlertFlag
-INA226-ALERT-CONVERSION-READY-FLAG    ::= 0x0008
-INA226-ALERT-CONVERSION-READY-OFFSET  ::= 0x03
-INA226-ALERT-CONVERSION-READY-LENGTH  ::= 0x01
-INA226-ALERT-FUNCTION-FLAG            ::= 0x0010
-INA226-ALERT-FUNCTION-OFFSET          ::= 0x04
-INA226-ALERT-FUNCTION-LENGTH          ::= 0x01
-INA226-ALERT-MATH-OVERFLOW-FLAG       ::= 0x0004
-INA226-ALERT-MATH-OVERFLOW-OFFSET     ::= 0x02
-INA226-ALERT-MATH-OVERFLOW-LENGTH     ::= 0x01
-INA226-ALERT-PIN-POLARITY-BIT         ::= 0x0002
-INA226-ALERT-PIN-POLARITY-OFFSET      ::= 0x01
-INA226-ALERT-PIN-POLARITY-LENGTH      ::= 0x01
-INA226-ALERT-LATCH-ENABLE-BIT         ::= 0x0001
-INA226-ALERT-LATCH-ENABLE-OFFSET      ::= 0x00
-INA226-ALERT-LATCH-ENABLE-LENGTH      ::= 0x01
-INA226-CONVERSION-READY-BIT           ::= 0x0800
-INA226-CONVERSION-READY-OFFSET        ::= 0x0A
-INA226-CONVERSION-READY-LENGTH        ::= 0x01
-
-//  returned by setMaxCurrentShunt
-INA226-ERR-NONE                       ::= 0x0000
-INA226-ERR-SHUNTVOLTAGE-HIGH          ::= 0x8000
-INA226-ERR-MAXCURRENT-LOW             ::= 0x8001
-INA226-ERR-SHUNT-LOW                  ::= 0x8002
-INA226-ERR-NORMALIZE-FAILED           ::= 0x8003
-
-INA226-MINIMAL-SHUNT-OHM              ::= 0.001
-INA226-MAX-WAIT-MS                    ::= 600
-INA226-MAX-SHUNT-VOLTAGE              ::= (81.92 / 1000)
-
-//  CONFIGURATION BITMASKS
-INA226-CONF-RESET-MASK                ::= 0x8000
-INA226-CONF-AVERAGE-MASK              ::= 0x0E00
-INA226-CONF-AVERAGE-OFFSET            ::= 0x09
-INA226-CONF-BUSVC-MASK                ::= 0x01C0
-INA226-CONF-BUSVC-OFFSET              ::= 0x06
-INA226-CONF-SHUNTVC-MASK              ::= 0x0038
-INA226-CONF-SHUNTVC-OFFSET            ::= 0x03
-INA226-CONF-MODE-MASK                 ::= 0x0007
-INA226-CONF-MODE-OFFSET               ::= 0x00
+// Alert Types that can set off the alert register and/or alert pin.
+ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
+ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
+ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
+ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
+ALERT-POWER-OVER                         ::= 0x0800
+ALERT-CURRENT-OVER                       ::= 0xFFFE
+ALERT-CURRENT-UNDER                      ::= 0xFFFF
+ALERT-CONVERSION-READY                   ::= 0x0400
 
 // AVERAGE SAMPLE SIZE ENUM 
-INA226-AVERAGE-1-SAMPLE               ::= 0x0000
-INA226-AVERAGE-4-SAMPLES              ::= 0x0001
-INA226-AVERAGE-16-SAMPLES             ::= 0x0002
-INA226-AVERAGE-64-SAMPLES             ::= 0x0003
-INA226-AVERAGE-128-SAMPLES            ::= 0x0004
-INA226-AVERAGE-256-SAMPLES            ::= 0x0005
-INA226-AVERAGE-512-SAMPLES            ::= 0x0006
-INA226-AVERAGE-1024-SAMPLES           ::= 0x0007
+AVERAGE-1-SAMPLE                         ::= 0x0000
+AVERAGE-4-SAMPLES                        ::= 0x0001
+AVERAGE-16-SAMPLES                       ::= 0x0002
+AVERAGE-64-SAMPLES                       ::= 0x0003
+AVERAGE-128-SAMPLES                      ::= 0x0004
+AVERAGE-256-SAMPLES                      ::= 0x0005
+AVERAGE-512-SAMPLES                      ::= 0x0006
+AVERAGE-1024-SAMPLES                     ::= 0x0007
 
 // BVCT and SVCT conversion timing ENUM
-INA226-TIMING-140-us                  ::= 0x0000
-INA226-TIMING-204-us                  ::= 0x0001
-INA226-TIMING-332-us                  ::= 0x0002
-INA226-TIMING-588-us                  ::= 0x0003
-INA226-TIMING-1100-us                 ::= 0x0004
-INA226-TIMING-2100-us                 ::= 0x0005
-INA226-TIMING-4200-us                 ::= 0x0006
-INA226-TIMING-8300-us                 ::= 0x0007
+TIMING-140-us                            ::= 0x0000
+TIMING-204-us                            ::= 0x0001
+TIMING-332-us                            ::= 0x0002
+TIMING-588-us                            ::= 0x0003
+TIMING-1100-us                           ::= 0x0004
+TIMING-2100-us                           ::= 0x0005
+TIMING-4200-us                           ::= 0x0006
+TIMING-8300-us                           ::= 0x0007
 
 // 'Measure Mode' (includes OFF)
-INA226-MODE-POWER-DOWN                ::= 0x0000
-INA226-MODE-TRIGGERED                 ::= 0x0003
-INA226-MODE-CONTINUOUS                ::= 0x0007
-
-// Die & Manufacturer Info Masks
-INA226-DIE-ID-RID-MASK                ::= 0x000F
-INA226-DIE-ID-DID-MASK                ::= 0xFFF0
+MODE-POWER-DOWN                          ::= 0x0000
+MODE-TRIGGERED                           ::= 0x0003
+MODE-CONTINUOUS                          ::= 0x0007
 
 class Driver:
-  /*****************************************************************
-  * Written by Wolfgang (Wolle) Ewald
-  * https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor (English)
-  * https://wolles-elektronikkiste.de/ina226 (German)
-  ******************************************************************/
+  // Core Register Addresses
+  static REGISTER-CONFIG_                ::= 0x00  //RW  // All-register reset, shunt voltage and bus voltage ADC conversion times and averaging, operating mode.
+  static REGISTER-SHUNT-VOLTAGE_         ::= 0x01  //R   // Shunt voltage measurement data
+  static REGISTER-BUS-VOLTAGE_           ::= 0x02  //R   // Bus voltage measurement data
+  static REGISTER-LOAD-POWER_            ::= 0x03  //R   // value of the calculated power being delivered to the load
+  static REGISTER-SHUNT-CURRENT_         ::= 0x04  //R   // value of the calculated current flowing through the shunt resistor
+  static REGISTER-CALIBRATION_           ::= 0x05  //RW  // Sets full-scale range and LSB of current and power measurements. Overall system calibration.
+  static REGISTER-MASK-ENABLE_           ::= 0x06  //RW  // Alert configuration and Conversion Ready flag
+  static REGISTER-ALERT-LIMIT_           ::= 0x07  //RW  // limit value to compare to the selected Alert function
+  static REGISTER-MANUF-ID_              ::= 0xFE  //R   // Contains unique manufacturer identification number.
+  static REGISTER-DIE-ID_                ::= 0xFF  //R   // Contains unique die identification number
 
-  static INA226-REGISTER-CONFIG_         ::= 0x00  //RW  // All-register reset, shunt voltage and bus voltage ADC conversion times and averaging, operating mode.
-  static INA226-REGISTER-SHUNT-VOLTAGE_  ::= 0x01  //R   // Shunt voltage measurement data
-  static INA226-REGISTER-BUS-VOLTAGE_    ::= 0x02  //R   // Bus voltage measurement data
-  static INA226-REGISTER-LOAD-POWER_     ::= 0x03  //R   // value of the calculated power being delivered to the load
-  static INA226-REGISTER-SHUNT-CURRENT_  ::= 0x04  //R   // value of the calculated current flowing through the shunt resistor
-  static INA226-REGISTER-CALIBRATION_    ::= 0x05  //RW  // Sets full-scale range and LSB of current and power measurements. Overall system calibration.
-  static INA226-REGISTER-MASK-ENABLE_    ::= 0x06  //RW  // Alert configuration and Conversion Ready flag
-  static INA226-REGISTER-ALERT-LIMIT_    ::= 0x07  //RW  // limit value to compare to the selected Alert function
-  static INA226-REGISTER-MANUF-ID_       ::= 0xFE  //R   // Contains unique manufacturer identification number.
-  static INA226-REGISTER-DIE-ID_         ::= 0xFF  //R   // Contains unique die identification number
+  // Die & Manufacturer Info Masks
+  static DIE-ID-RID-MASK_                ::= 0x000F // Masks its part of the REGISTER-DIE-ID Register
+  static DIE-ID-DID-MASK_                ::= 0xFFF0 // Masks its part of the REGISTER-DIE-ID Register
+
+  // Configuration Bitmasks
+  static CONF-RESET-MASK_                ::= 0x8000
+  static CONF-AVERAGE-MASK_              ::= 0x0E00
+  static CONF-AVERAGE-OFFSET_            ::= 9
+  static CONF-BUSVC-MASK_                ::= 0x01C0
+  static CONF-BUSVC-OFFSET_              ::= 6
+  static CONF-SHUNTVC-MASK_              ::= 0x0038
+  static CONF-SHUNTVC-OFFSET_            ::= 3
+  static CONF-MODE-MASK_                 ::= 0x0007
+  static CONF-MODE-OFFSET_               ::= 0
+
+  //  Get Alert Flag
+  static ALERT-CONVERSION-READY-FLAG_    ::= 0x0008
+  static ALERT-CONVERSION-READY-OFFSET_  ::= 3
+  static ALERT-CONVERSION-READY-LENGTH_  ::= 1
+  static ALERT-FUNCTION-FLAG_            ::= 0x0010
+  static ALERT-FUNCTION-OFFSET_          ::= 4
+  static ALERT-FUNCTION-LENGTH_          ::= 1
+  static ALERT-MATH-OVERFLOW-FLAG_       ::= 0x0004
+  static ALERT-MATH-OVERFLOW-OFFSET_     ::= 2
+  static ALERT-MATH-OVERFLOW-LENGTH_     ::= 1
+  static ALERT-PIN-POLARITY-BIT_         ::= 0x0002
+  static ALERT-PIN-POLARITY-OFFSET_      ::= 1
+  static ALERT-PIN-POLARITY-LENGTH_      ::= 1
+  static ALERT-LATCH-ENABLE-BIT_         ::= 0x0001
+  static ALERT-LATCH-ENABLE-OFFSET_      ::= 0
+  static ALERT-LATCH-ENABLE-LENGTH_      ::= 1
+  static CONVERSION-READY-BIT_           ::= 0x0800
+  static CONVERSION-READY-OFFSET_        ::= 10
+  static CONVERSION-READY-LENGTH_        ::= 1
+
+
 
   // Globals
   debug_/bool                := false
@@ -137,7 +129,7 @@ class Driver:
   
   currentDivider_mA_/float   := 0.0
   pwrMultiplier_mW_/float    := 0.0
-  lastMeasureMode_/int       := INA226-MODE-CONTINUOUS
+  lastMeasureMode_/int       := MODE-CONTINUOUS
   current-LSB_/float         := 0.0
   shuntResistor_/float       := 0.0
   corrFactorA_/float         := 0.0
@@ -180,9 +172,9 @@ class Driver:
     // calibration-value --value=DEFAULT-CALIBRATION-VALUE
 
     // Initialise Default sampling, conversion timing, and measuring mode
-    sampling-rate       --rate=INA226-AVERAGE-512-SAMPLES
-    conversion-time     --time=INA226-TIMING-1100-us
-    measure-mode        --mode=INA226-MODE-CONTINUOUS
+    sampling-rate       --rate=AVERAGE-512-SAMPLES
+    conversion-time     --time=TIMING-1100-us
+    measure-mode        --mode=MODE-CONTINUOUS
 
     // Set Defaults for Resistor Range
     // NOTE:  There appears to have been originally two constants/values for 'current range'
@@ -211,8 +203,8 @@ class Driver:
       val1 = die-id --did
       busy
       print "*      : single-measurement --nowait "
-      measure-mode   --mode=INA226-MODE-TRIGGERED
-      sampling-rate  --rate=INA226-AVERAGE-256-SAMPLES
+      measure-mode   --mode=MODE-TRIGGERED
+      sampling-rate  --rate=AVERAGE-256-SAMPLES
       print "*      : single-measurement"
       single-measurement
       print "*      :                             ... done"
@@ -222,26 +214,26 @@ class Driver:
       alert-pin-polarity --inverted
       val1 = conversion-ready
 
-      set-alert --type=INA226-ALERT-BUS-OVER-VOLTAGE --limit=3.5
+      set-alert --type=ALERT-BUS-OVER-VOLTAGE --limit=3.5
       val1 = alert-limit
       conversion-ready --enable-alert-pin
       alert-latch --disable
       val1 = alert-latch
       alert-pin-polarity --normal
       val1 = alert-pin-polarity
-      sampling-rate  --rate=INA226-AVERAGE-256-SAMPLES
-      measure-mode   --mode=INA226-MODE-CONTINUOUS
+      sampling-rate  --rate=AVERAGE-256-SAMPLES
+      measure-mode   --mode=MODE-CONTINUOUS
   */
 
   // Reset Device
   // NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears
   // 
   reset_ -> none:
-    oldMask := reg_.read-u16-be INA226-REGISTER-CONFIG_
-    newMask := oldMask | INA226-CONF-RESET-MASK
-    reg_.write-u16-be INA226-REGISTER-CONFIG_ newMask
+    oldMask := reg_.read-u16-be REGISTER-CONFIG_
+    newMask := oldMask | CONF-RESET-MASK_
+    reg_.write-u16-be REGISTER-CONFIG_ newMask
     sleep --ms=(estimated-conversion-time --ms)
-    nowMask := reg_.read-u16-be INA226-REGISTER-CONFIG_
+    nowMask := reg_.read-u16-be REGISTER-CONFIG_
     if debug_: print "*      : reset - 0x$(%02x oldMask) [to 0x$(%02x newMask)] - after reset 0x$(%02x nowMask)"
 
   // Set Calibration Value 
@@ -249,8 +241,8 @@ class Driver:
   // 
   calibration-value --value/int -> none:
     // Replaces the existing calibration value 
-    oldRegister := reg_.read-u16-be INA226-REGISTER-CALIBRATION_
-    reg_.write-u16-be INA226-REGISTER-CALIBRATION_ value
+    oldRegister := reg_.read-u16-be REGISTER-CALIBRATION_
+    reg_.write-u16-be REGISTER-CALIBRATION_ value
     if debug_: print "*      : calibration-value         changed from $(oldRegister) to $(value)"
     calCheck/int := calibration-value
     if debug_: print "*      : calibration-value CHECKED changed from $(oldRegister) to $(calCheck)"
@@ -259,7 +251,7 @@ class Driver:
   // Get Calibration Value
   //
   calibration-value -> int:
-    register := reg_.read-u16-be INA226-REGISTER-CALIBRATION_
+    register := reg_.read-u16-be REGISTER-CALIBRATION_
     if debug_: print "*      : calibration-value retrieved $(register)"
     return register
 
@@ -275,18 +267,18 @@ class Driver:
   // Adjust Sampling Rate for measurements
   //
   sampling-rate --rate/int -> none:
-    oldMask/int  := reg_.read-u16-be INA226-REGISTER-CONFIG_
+    oldMask/int  := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int  := oldMask
-    newMask      &= ~(INA226-CONF-AVERAGE-MASK)
+    newMask      &= ~(CONF-AVERAGE-MASK_)
     newMask      |= (rate << 9)
-    reg_.write-u16-be INA226-REGISTER-CONFIG_ newMask
+    reg_.write-u16-be REGISTER-CONFIG_ newMask
     if debug_: print "*      : sampling-rate set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
   // Retrieve current sampling rate code/enum value
   // 
   sampling-rate --code -> int:
-    mask := reg_.read-u16-be INA226-REGISTER-CONFIG_
-    return ((mask & INA226-CONF-AVERAGE-MASK) >> 9)
+    mask := reg_.read-u16-be REGISTER-CONFIG_
+    return ((mask & CONF-AVERAGE-MASK_) >> 9)
 
   // Return human readable sampling count number
   // 
@@ -304,19 +296,19 @@ class Driver:
   //        - Current isn’t measured directly — it’s computed later from Vshunt/Rshunt
   //
   conversion-time --bus/int -> none:
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-CONFIG_
+    oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
-    newMask     &= ~INA226-CONF-BUSVC-MASK
-    newMask     |= (bus << INA226-CONF-BUSVC-OFFSET)
-    reg_.write-u16-be INA226-REGISTER-CONFIG_ newMask
+    newMask     &= ~CONF-BUSVC-MASK_
+    newMask     |= (bus << CONF-BUSVC-OFFSET_)
+    reg_.write-u16-be REGISTER-CONFIG_ newMask
     if debug_: print "*      : conversion-time --bus set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
   
   conversion-time --shunt/int -> none:
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-CONFIG_
+    oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
-    newMask     &= ~INA226-CONF-SHUNTVC-MASK
-    newMask     |= (shunt << INA226-CONF-SHUNTVC-OFFSET)
-    reg_.write-u16-be INA226-REGISTER-CONFIG_ newMask
+    newMask     &= ~CONF-SHUNTVC-MASK_
+    newMask     |= (shunt << CONF-SHUNTVC-OFFSET_)
+    reg_.write-u16-be REGISTER-CONFIG_ newMask
     if debug_: print "*      : conversion-time --shunt set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
   // Sets both to the same when one value is given
@@ -328,13 +320,13 @@ class Driver:
   // NOTE:  Keeps track of last measure mode set, in a global. Ensures device comes back on
   //        into the same mode using 'PowerOn'
   measure-mode --mode/int -> none:
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-CONFIG_
+    oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
-    newMask     &= ~(INA226-CONF-MODE-MASK)
+    newMask     &= ~(CONF-MODE-MASK_)
     newMask     |= mode  //low value, no left shift offset
-    reg_.write-u16-be INA226-REGISTER-CONFIG_ newMask
+    reg_.write-u16-be REGISTER-CONFIG_ newMask
     if debug_: print "*      : measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
-    if (mode != INA226-MODE-POWER-DOWN): lastMeasureMode_ = mode
+    if (mode != MODE-POWER-DOWN): lastMeasureMode_ = mode
 
   // Set resistor and current range, independently 
   // NOTE:  Resistor value in ohm, Current range in A
@@ -353,13 +345,13 @@ class Driver:
   // MEASUREMENT FUNCTIONS
 
   shunt-current --amps -> float:
-    register   := reg_.read-i16-be INA226-REGISTER-SHUNT-CURRENT_
+    register   := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
     return (register * current-LSB_ * corrFactorA_)
   
   shunt-current --milliamps -> float:   return ((shunt-current --amps) * 1000.0)
 
   shunt-voltage --volts -> float:
-    register := reg_.read-i16-be INA226-REGISTER-SHUNT-VOLTAGE_
+    register := reg_.read-i16-be REGISTER-SHUNT-VOLTAGE_
     return (register * 0.0000025)
 
   shunt-voltage --millivolts -> float:  return (shunt-voltage --volts) * 1000.0
@@ -380,7 +372,7 @@ class Driver:
     // internally to IN− (the low side of the shunt). So in practice, “bus voltage” 
     // usually means the voltage at the load side of the shunt.  This is what the 
     // load actually sees as its supply rail.
-    register := reg_.read-i16-be INA226-REGISTER-BUS-VOLTAGE_
+    register := reg_.read-i16-be REGISTER-BUS-VOLTAGE_
     return (register * 0.00125)
 
   bus-voltage  --millivolts -> float:
@@ -388,7 +380,7 @@ class Driver:
   
   load-power --milliwatts -> float:
     // Using the cached multiplier [pwrMultiplier_mW_ = 1000 * 25 * current-LSB_]
-    register := reg_.read-u16-be INA226-REGISTER-LOAD-POWER_
+    register := reg_.read-u16-be REGISTER-LOAD-POWER_
     return (register * pwrMultiplier_mW_).to-float
 
   load-power --watts -> float:
@@ -404,21 +396,21 @@ class Driver:
   // NOTE:  The powering on relies on the cached global variable which
   //        records what it was last set to.
   power-down -> none:
-    measure-mode --mode=INA226-MODE-POWER-DOWN
+    measure-mode --mode=MODE-POWER-DOWN
   power-up -> none:
     measure-mode --mode=lastMeasureMode_
     sleep --ms=(estimated-conversion-time --ms)
 
   // Returns true if conversion is still ongoing
   busy -> bool:
-    register/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_            // clears CNVR (Conversion Ready) Flag
-    val/bool     :=  ((register & INA226-ALERT-CONVERSION-READY-FLAG) == 0)
-    // if debug_: print "*      : busy compares  reg:val                              $(bits-16 register) to $(bits-16 INA226-ALERT-CONVERSION-READY-FLAG)"
+    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_            // clears CNVR (Conversion Ready) Flag
+    val/bool     :=  ((register & ALERT-CONVERSION-READY-FLAG_) == 0)
+    // if debug_: print "*      : busy compares  reg:val                              $(bits-16 register) to $(bits-16 ALERT-CONVERSION-READY-FLAG)"
     // if debug_: print "*      : busy returns $(val)"
     return val
 
   wait-until-conversion-completed -> none:
-    maxWaitTimeMs/int   := INA226-MAX-WAIT-MS
+    maxWaitTimeMs/int   := estimated-conversion-time --ms
     curWaitTimeMs/int   := 0
     sleepIntervalMs/int := 50
     while busy:                                                               // checks if sampling is completed
@@ -439,9 +431,9 @@ class Driver:
   // Perform a single conversion - without waiting
   //
   single-measurement --nowait -> none:
-    maskRegister/int   := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_      // clears CNVR (Conversion Ready) Flag
-    confRegister/int   := reg_.read-u16-be INA226-REGISTER-CONFIG_     
-    reg_.write-u16-be INA226-REGISTER-CONFIG_ confRegister                   // Starts conversion
+    maskRegister/int   := reg_.read-u16-be REGISTER-MASK-ENABLE_      // clears CNVR (Conversion Ready) Flag
+    confRegister/int   := reg_.read-u16-be REGISTER-CONFIG_     
+    reg_.write-u16-be REGISTER-CONFIG_ confRegister                   // Starts conversion
 
   // ALERT FUNCTIONS 
 
@@ -455,37 +447,37 @@ class Driver:
   set-alert --type/int --limit/float -> none:
     alertLimit/float := 0.0
 
-    if type == INA226-ALERT-SHUNT-OVER-VOLTAGE:
+    if type == ALERT-SHUNT-OVER-VOLTAGE:
       alertLimit = limit * 400          
-    else if type == INA226-ALERT-SHUNT-UNDER-VOLTAGE:
+    else if type == ALERT-SHUNT-UNDER-VOLTAGE:
       alertLimit = limit * 400
-    else if type == INA226-ALERT-CURRENT-OVER:
-      type = INA226-ALERT-SHUNT-OVER-VOLTAGE
+    else if type == ALERT-CURRENT-OVER:
+      type = ALERT-SHUNT-OVER-VOLTAGE
       alertLimit = limit * 2048 * currentDivider_mA_ / (calibration-value).to-float
-    else if type == INA226-ALERT-CURRENT-UNDER:
-      type = INA226-ALERT-SHUNT-UNDER-VOLTAGE
+    else if type == ALERT-CURRENT-UNDER:
+      type = ALERT-SHUNT-UNDER-VOLTAGE
       alertLimit = limit * 2048 * currentDivider_mA_ / (calibration-value).to-float
-    else if type == INA226-ALERT-BUS-OVER-VOLTAGE:
+    else if type == ALERT-BUS-OVER-VOLTAGE:
       alertLimit = limit * 800
-    else if type == INA226-ALERT-BUS-UNDER-VOLTAGE:
+    else if type == ALERT-BUS-UNDER-VOLTAGE:
       alertLimit = limit * 800
-    else if type == INA226-ALERT-POWER-OVER:
+    else if type == ALERT-POWER-OVER:
       alertLimit = limit / pwrMultiplier_mW_
     else:
       if debug_: print "*      : set-alert unexpected alert type"
       throw "set-alert unexpected alert type"
     
     // Set Alert Type Flag
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     newMask/int := oldMask
     newMask     &= ~(0xF800)    // clear old alert values (bits D11 to D15) - only one alert allowed at once
     newMask     |= type         // already bit shifted in the mask constants!
-    reg_.write-u16-be INA226-REGISTER-MASK-ENABLE_ newMask
+    reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
     // if debug_: print "*      : set-alert mask set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
     if debug_: print "*      : set-alert mask                                      $(bits-16 oldMask) to $(bits-16 newMask)"
 
     // Set Alert Limit Value
-    reg_.write-u16-be INA226-REGISTER-ALERT-LIMIT_ (alertLimit).to-int
+    reg_.write-u16-be REGISTER-ALERT-LIMIT_ (alertLimit).to-int
     if debug_: print "*      : set-alert alert limit set to $(alertLimit)"
 
   // Alert "Latching"
@@ -499,11 +491,11 @@ class Driver:
   //
   alert-latch --set/int -> none:
     assert: 0 <= set <= 1
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     newMask/int := oldMask
-    newMask     &= ~(INA226-ALERT-LATCH-ENABLE-BIT)
-    newMask     |= (set << INA226-ALERT-LATCH-ENABLE-OFFSET)
-    reg_.write-u16-be INA226-REGISTER-MASK-ENABLE_ newMask
+    newMask     &= ~(ALERT-LATCH-ENABLE-BIT_)
+    newMask     |= (set << ALERT-LATCH-ENABLE-OFFSET_)
+    reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
     // if debug_: print "*      : alert-latch enable set from 0x$(%01x oldMask) to 0x$(%01x newMask)"
     if debug_: print "*      : alert-latch alert-pin $(set) is                          $(bits-16 oldMask) to $(bits-16 newMask)"
 
@@ -520,9 +512,9 @@ class Driver:
   // Retrieve Latch Configuration
   //
   alert-latch -> bool:
-    mask/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    mask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     latch/bool := false
-    latchBit/int := ((mask & INA226-ALERT-LATCH-ENABLE-BIT) >> INA226-ALERT-LATCH-ENABLE-OFFSET) & INA226-ALERT-LATCH-ENABLE-LENGTH
+    latchBit/int := ((mask & ALERT-LATCH-ENABLE-BIT_) >> ALERT-LATCH-ENABLE-OFFSET_) & ALERT-LATCH-ENABLE-LENGTH_
     if latchBit == 1: latch = true
     if debug_: print "*      : alert-latch is is $(latchBit) [$(latch)]"
     return latch
@@ -534,11 +526,11 @@ class Driver:
   //
   alert-pin-polarity --set/int -> none:
     assert: 0 <= set <= 1
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     newMask/int := oldMask
-    newMask     &= ~(INA226-ALERT-PIN-POLARITY-BIT)
-    newMask     |= (set << INA226-ALERT-PIN-POLARITY-OFFSET)
-    reg_.write-u16-be INA226-REGISTER-MASK-ENABLE_ newMask
+    newMask     &= ~(ALERT-PIN-POLARITY-BIT_)
+    newMask     |= (set << ALERT-PIN-POLARITY-OFFSET_)
+    reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
     //if debug_: print "*      : alert-pin-polarity enable set from 0x$(%01x oldMask) to 0x$(%01x newMask)"
     if debug_: print "*      : alert-pin-polarity alert-pin $(set) is                   $(bits-16 oldMask) to $(bits-16 newMask)"
 
@@ -550,9 +542,9 @@ class Driver:
   //
   alert-pin-polarity -> bool:
     // inverted = true, normal = false
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     polarityInverted/bool := false
-    polarityInvertedBit/int := ((oldMask & INA226-ALERT-PIN-POLARITY-BIT) >> INA226-ALERT-PIN-POLARITY-OFFSET) & INA226-ALERT-PIN-POLARITY-LENGTH
+    polarityInvertedBit/int := ((oldMask & ALERT-PIN-POLARITY-BIT_) >> ALERT-PIN-POLARITY-OFFSET_) & ALERT-PIN-POLARITY-LENGTH_
     if polarityInvertedBit == 1: polarityInverted = true
     if debug_: print "*      : alert-pin-polarity is $(polarityInvertedBit) [$(polarityInverted)]"
     return polarityInverted
@@ -570,27 +562,27 @@ class Driver:
     if debug_: 
       return overflow-alert or limit-alert or conversion-ready-alert
     else:
-      register/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
-      checkMask    := INA226-ALERT-MATH-OVERFLOW-FLAG | INA226-ALERT-FUNCTION-FLAG | INA226-ALERT-CONVERSION-READY-FLAG
+      register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
+      checkMask    := ALERT-MATH-OVERFLOW-FLAG_ | ALERT-FUNCTION-FLAG_ | ALERT-CONVERSION-READY-FLAG_
       return (register & checkMask) != 0
 
   // clear alerts
   alert --clear -> none:
     // Not Tested - manual suggests reading the MASK-ENABLE is enough to clear any alerts
-    register/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
 
   overflow-alert   -> bool:
-    register/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     overflow := false
-    overflowBit := ((register & INA226-ALERT-MATH-OVERFLOW-FLAG) >> INA226-ALERT-MATH-OVERFLOW-OFFSET ) & INA226-ALERT-MATH-OVERFLOW-LENGTH
+    overflowBit := ((register & ALERT-MATH-OVERFLOW-FLAG_) >> ALERT-MATH-OVERFLOW-OFFSET_ ) & ALERT-MATH-OVERFLOW-LENGTH_
     if overflowBit == 1: overflow = true
     if debug_: print "*      : alert: overflow bit is $(overflowBit) [$(overflow)]"
     return overflow
 
   limit-alert      -> bool:
-    register/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     overflow := false
-    overflowBit := ((register & INA226-ALERT-FUNCTION-FLAG) >> INA226-ALERT-FUNCTION-OFFSET ) & INA226-ALERT-FUNCTION-LENGTH
+    overflowBit := ((register & ALERT-FUNCTION-FLAG_) >> ALERT-FUNCTION-OFFSET_ ) & ALERT-FUNCTION-LENGTH_
     if overflowBit == 1: overflow = true
     if debug_: print "*      : alert: configured limit bit is $(overflowBit) [$(overflow)]"
     return overflow
@@ -606,9 +598,9 @@ class Driver:
   //        2. Reading the Mask/Enable Register
   //
   conversion-ready-alert -> bool:
-    register/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     conversionReady := false
-    conversionReadyBit := ((register & INA226-ALERT-CONVERSION-READY-FLAG) >> INA226-ALERT-CONVERSION-READY-OFFSET ) & INA226-ALERT-CONVERSION-READY-LENGTH
+    conversionReadyBit := ((register & ALERT-CONVERSION-READY-FLAG_) >> ALERT-CONVERSION-READY-OFFSET_ ) & ALERT-CONVERSION-READY-LENGTH_
     if conversionReadyBit == 1: conversionReady = true
     if debug_: print "*      : alert: conversion ready bit is $(conversionReadyBit) [$(conversionReady)]"
     return conversionReady
@@ -622,11 +614,11 @@ class Driver:
   //
   conversion-ready --set/int -> none:
     assert: 0 <= set <= 1
-    oldMask/int := reg_.read-u16-be INA226-REGISTER-MASK-ENABLE_
+    oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     newMask/int := oldMask
-    newMask     &= ~(INA226-CONVERSION-READY-BIT)
-    newMask     |= (set << INA226-CONVERSION-READY-OFFSET) // already bit shifted
-    reg_.write-u16-be INA226-REGISTER-MASK-ENABLE_ newMask
+    newMask     &= ~(CONVERSION-READY-BIT_)
+    newMask     |= (set << CONVERSION-READY-OFFSET_) // already bit shifted
+    reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
     if debug_: print "*      : conversion-ready alert-pin $(set) is                     $(bits-16 oldMask) to $(bits-16 newMask)"
 
   // Helpful alias for setting 'conversion-ready' on alert pin
@@ -639,7 +631,7 @@ class Driver:
   conversion-ready --disable-alert-pin -> none:
     conversion-ready --set=0
 
-  // Returns microsecs for INA226-TIMING-x-us statics 0..7
+  // Returns microsecs for TIMING-x-us statics 0..7
   // NOTE:  A helper function
   conversion-time-us-from-enum --code/int -> int:
     assert: 0 <= code <= 7
@@ -653,7 +645,7 @@ class Driver:
     if code == 7: return 8300
     return 1100  // default/defensive - should never happen
 
-  // Returns sample count for INA226-AVERAGE-x-SAMPLE statics 0..7
+  // Returns sample count for AVERAGE-x-SAMPLE statics 0..7
   // NOTE:  A helper function
   sampling-rate-from-enum --code/int -> int:
     assert: 0 <= code <= 7
@@ -673,12 +665,12 @@ class Driver:
   //        due to timing configurations 
   estimated-conversion-time --ms -> int:
     // Read config and decode fields using masks/offsets
-    register/int    := reg_.read-u16-be INA226-REGISTER-CONFIG_
+    register/int    := reg_.read-u16-be REGISTER-CONFIG_
 
-    samplesCode/int    := (register & INA226-CONF-AVERAGE-MASK)  >> INA226-CONF-AVERAGE-OFFSET
-    busCTcode/int      := (register & INA226-CONF-BUSVC-MASK)    >> INA226-CONF-BUSVC-OFFSET
-    shuntCTcode/int    := (register & INA226-CONF-SHUNTVC-MASK)  >> INA226-CONF-SHUNTVC-OFFSET
-    mode/int           := (register & INA226-CONF-MODE-MASK)     >> INA226-CONF-MODE-OFFSET
+    samplesCode/int    := (register & CONF-AVERAGE-MASK_)  >> CONF-AVERAGE-OFFSET_
+    busCTcode/int      := (register & CONF-BUSVC-MASK_)    >> CONF-BUSVC-OFFSET_
+    shuntCTcode/int    := (register & CONF-SHUNTVC-MASK_)  >> CONF-SHUNTVC-OFFSET_
+    mode/int           := (register & CONF-MODE-MASK_)     >> CONF-MODE-OFFSET_
 
     samplingRate/int   := sampling-rate-from-enum            --code = samplesCode
     busCT/int          := conversion-time-us-from-enum       --code = busCTcode
@@ -704,22 +696,16 @@ class Driver:
   // NOTE:  maybe useful if expanding driver to suit an additional sibling device
   //
   manufacturer-id -> int:
-    manid := reg_.read-u16-be INA226-REGISTER-MANUF-ID_
+    manid := reg_.read-u16-be REGISTER-MANUF-ID_
     if debug_: print "*      : manufacturer-id is 0x$(%04x manid) [$(manid)]"
     return manid
   
-  // NOTE: Given DID and RID below, this value on its own may be redundant
-  die-id -> int:
-    dieid := reg_.read-u16-be INA226-REGISTER-DIE-ID_
-    if debug_: print "*      : die-id register is 0x$(%04x dieid) [$(dieid)]"
-    return dieid
-
   // Device ID Bits
   // NOTE:  Bits 4-15 Stores the device identification bits
   // 
   device-identification -> int:
-    register := reg_.read-u16-be INA226-REGISTER-DIE-ID_
-    dieidDid := (register & INA226-DIE-ID-DID-MASK) >> 4
+    register := reg_.read-u16-be REGISTER-DIE-ID_
+    dieidDid := (register & DIE-ID-DID-MASK_) >> 4
     if debug_: print "*      : die-id DID is      0x$(%04x dieidDid) [$(dieidDid)]"
     return dieidDid
 
@@ -727,8 +713,8 @@ class Driver:
   // NOTE:  Bit 0-3 Stores the device revision identification bits
   //
   device-revision -> int:
-    register := reg_.read-u16-be INA226-REGISTER-DIE-ID_
-    dieidRid := (register & INA226-DIE-ID-RID-MASK)
+    register := reg_.read-u16-be REGISTER-DIE-ID_
+    dieidRid := (register & DIE-ID-RID-MASK_)
     if debug_: print "*      : die-id RID is      0x$(%04x dieidRid) [$(dieidRid)]"
     return dieidRid
 
@@ -837,7 +823,7 @@ class Driver:
     if supplyVoltage > 0.0: shuntVoltageDeltaPct = (shuntVoltageDelta / supplyVoltage) * 100.0
 
     calibrationValue/int             := calibration-value
-    currentRaw/int                   := reg_.read-i16-be INA226-REGISTER-SHUNT-CURRENT_
+    currentRaw/int                   := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
     leastSignificantBit/float        := 0.00512 / (calibrationValue.to-float * shuntResistor_)
     currentChip/float                := currentRaw * leastSignificantBit
     currentVR/float                  := shuntVoltage / shuntResistor_
@@ -894,7 +880,7 @@ class Driver:
 
 /*
 
-void INA226-WE::setCurrentRange(INA226-CURRENT-RANGE range){ // deprecated, left for downward compatibility
+void WE::setCurrentRange(CURRENT-RANGE range){ // deprecated, left for downward compatibility
     deviceCurrentRange = range    
 }
 
