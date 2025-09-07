@@ -14,8 +14,6 @@ import serial.registers as registers
 //
 // TI Module Datasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf
 //
-// Qdos: Other code reviewed whilst working this out:
-// https://github.com/RobTillaart/INA226/blob/master/INA226.cpp
 //
   /*****************************************************************
   * Written by Wolfgang (Wolle) Ewald
