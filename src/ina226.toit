@@ -70,7 +70,7 @@ INA226-ERR-SHUNT-LOW                  ::= 0x8002
 INA226-ERR-NORMALIZE-FAILED           ::= 0x8003
 
 INA226-MINIMAL-SHUNT-OHM              ::= 0.001
-INA226-MAX-WAIT-MS                    ::= 600   //  millis
+INA226-MAX-WAIT-MS                    ::= 600
 INA226-MAX-SHUNT-VOLTAGE              ::= (81.92 / 1000)
 
 //  CONFIGURATION BITMASKS
