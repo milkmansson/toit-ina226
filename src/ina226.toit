@@ -717,7 +717,7 @@ class Driver:
   // Device ID Bits
   // NOTE:  Bits 4-15 Stores the device identification bits
   // 
-  die-id --did -> int:
+  device-identification -> int:
     register := reg_.read-u16-be INA226-REGISTER-DIE-ID_
     dieidDid := (register & INA226-DIE-ID-DID-MASK) >> 4
     if debug_: print "*      : die-id DID is      0x$(%04x dieidDid) [$(dieidDid)]"
