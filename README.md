@@ -141,7 +141,9 @@ So, once calibrated, it can always be checked by:
 One would assume you are here because you know what Toit is.  If you dont:
 
 # Credits
-- Wolfgang Ewald <WEwald@gmx.de> for the original code [published here](https://github.com/wollewald/INA226_WE)
+- Wolfgang (Wolle) Ewald <WEwald@gmx.de> for the original code [published here](https://github.com/wollewald/INA226_WE)
+  - https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor (English)
+  - https://wolles-elektronikkiste.de/ina226 (German)
 - Rob Tillaart's work [here](https://github.com/RobTillaart/INA226) which helped me understand and correct the work
 - Florian Loitsch and for the tireless help and encouragement
 - The wider Toit developer team (past and present) for a truly excellent product

@@ -5,22 +5,50 @@ import serial.registers as registers
 // Copyright (C) 2025 Ian
 // Use of this source code is governed by an MIT-style license that can be
 // found in the package's LICENSE file.
-// Toit Driver Library for an INA226 module, DC Shunt current and power sensor
-// Module not unlike this: https://esphome.io/components/sensor/ina226/
-//
-// Credits: Code has been shamelessly plagiarised/ported from work originally
-//          by Wolfgang Ewald <WEwald@gmx.de> originally published on Github
-//          here https://github.com/wollewald/INA226_WE  
-//
-// TI Module Datasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf
-//
-//
-  /*****************************************************************
-  * Written by Wolfgang (Wolle) Ewald
-  * https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor (English)
-  * https://wolles-elektronikkiste.de/ina226 (German)
-  ******************************************************************/
 
+/**
+Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/ 
+There are others with different feature sets and may be partially code compatible.
+
+# Simplest Use Case
+Simplest use case assumes an unmodified module with default wiring guidelines followed.  (Please see the Readme for pointers & guidance.) Assumes:
+ - Module shunt resistor value R100 (0.1 Ohm)
+ - Sample size of 1 (eg, no averaging)
+ - Conversion time of 1100us
+ - Continuous Mode
+```
+import gpio
+import i2c
+import ina226
+
+main:
+  frequency := 400_000
+  sda := gpio.Pin 26
+  scl := gpio.Pin 25
+  bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
+
+  ina226device := bus.device ina226.DEFAULT_I2C_ADDRESS
+  ina226driver := ina226.Driver ina226device
+
+  # Wait for first registers to be ready
+  single-measurement
+  
+  # Continuously read and display values
+  while true:
+    print "$(%0.3f (ina226driver.load-current --amps))a"
+    print "$(%0.2f (ina226driver.supply-voltage --volts))v"
+    print "$(%0.4f (ina226driver.load-power --watts))w"
+    sleep --ms=50
+```
+
+  # Default setup assumes a R100 (0.100 Ohm) shunt resistor
+  # For a module with a 0.5 Ohm resistor, set it with: 
+  #resistor-range --resistor=0.5
+
+
+
+
+*/
 
 /** 
 
@@ -46,7 +74,7 @@ ALERT-CURRENT-UNDER                      ::= 0xFFFF
 ALERT-CONVERSION-READY                   ::= 0x0400
 
 // AVERAGE SAMPLE SIZE ENUM 
-AVERAGE-1-SAMPLE                         ::= 0x0000
+AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
 AVERAGE-4-SAMPLES                        ::= 0x0001
 AVERAGE-16-SAMPLES                       ::= 0x0002
 AVERAGE-64-SAMPLES                       ::= 0x0003
@@ -60,7 +88,7 @@ TIMING-140-US                            ::= 0x0000
 TIMING-204-US                            ::= 0x0001
 TIMING-332-US                            ::= 0x0002
 TIMING-588-US                            ::= 0x0003
-TIMING-1100-US                           ::= 0x0004
+TIMING-1100-US                           ::= 0x0004 // Default
 TIMING-2100-US                           ::= 0x0005
 TIMING-4200-US                           ::= 0x0006
 TIMING-8300-US                           ::= 0x0007
@@ -125,6 +153,7 @@ class Driver:
   last-measure-mode_/int                 := MODE-CONTINUOUS
   current-LSB_/float                     := 0.0
   shunt-resistor_/float                  := 0.0
+  current-range_/float                   := 0.0
   correction-factor-a_/float             := 0.0
 
   constructor dev/serial.Device --debug/bool=false:
@@ -157,7 +186,7 @@ class Driver:
     // calibration-value --value=DEFAULT-CALIBRATION-VALUE
 
     // Initialise Default sampling, conversion timing, and measuring mode
-    sampling-rate --rate=AVERAGE-512-SAMPLES
+    sampling-rate --rate=AVERAGE-1-SAMPLE
     conversion-time --time=TIMING-1100-US
     measure-mode --mode=MODE-CONTINUOUS
 
@@ -317,8 +346,9 @@ class Driver:
   // NOTE:  Resistor value in ohm, Current range in A
   // 
   resistor-range --resistor/float --current-range/float -> none:
-    shunt-resistor_        = resistor    // Cache to global for later use
-    current-LSB_           = current_range / 32768.0                // A per bit (LSB)
+    shunt-resistor_        = resistor                               // Cache to class-wide for later use
+    current-range_         = current-range
+    current-LSB_           = (current_range / 32768.0)     // A per bit (LSB)
     if debug_: print "*      : resistor-range: current per bit = $(current-LSB_)A"
     calibrationValue   := 0.00512 / (current-LSB_ * resistor)
     if debug_: print "*      : resistor-range: calibration value becomes = $(calibrationValue)"
@@ -326,7 +356,10 @@ class Driver:
     current-divider_ma_    = 0.001 / current-LSB_
     power-multiplier_mw_   = 1000.0 * 25.0 * current-LSB_
     // TODO: Check for accuracy on the to-int
-  
+
+  resistor-range --resistor/float -> none:
+    resistor-range --resistor=resistor --current-range=current-range_
+
   // MEASUREMENT FUNCTIONS
 
   shunt-current --amps -> float:
