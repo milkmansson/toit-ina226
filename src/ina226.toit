@@ -1,10 +1,53 @@
+// Copyright (C) 2025 Ian
+// Use of this source code is governed by an MIT-style license that can be
+// found in the package's LICENSE file.
+
 import binary
 import serial.device as serial
 import serial.registers as registers
 
-// Copyright (C) 2025 Ian
-// Use of this source code is governed by an MIT-style license that can be
-// found in the package's LICENSE file.
+
+
+// DEFAULT-I2C-ADDRESS is 64 with jumper defaults.
+// Valid address values: 64 to 79 - See datasheet table 6-2
+DEFAULT-I2C-ADDRESS                      ::= 0x40
+
+// Constants to be used by users during configuration
+
+// Alert Types that can set off the alert register and/or alert pin.
+ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
+ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
+ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
+ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
+ALERT-POWER-OVER                         ::= 0x0800
+ALERT-CURRENT-OVER                       ::= 0xFFFE
+ALERT-CURRENT-UNDER                      ::= 0xFFFF
+ALERT-CONVERSION-READY                   ::= 0x0400
+
+// AVERAGE SAMPLE SIZE ENUM 
+AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
+AVERAGE-4-SAMPLES                        ::= 0x0001
+AVERAGE-16-SAMPLES                       ::= 0x0002
+AVERAGE-64-SAMPLES                       ::= 0x0003
+AVERAGE-128-SAMPLES                      ::= 0x0004
+AVERAGE-256-SAMPLES                      ::= 0x0005
+AVERAGE-512-SAMPLES                      ::= 0x0006
+AVERAGE-1024-SAMPLES                     ::= 0x0007
+
+// BVCT and SVCT conversion timing ENUM
+TIMING-140-US                            ::= 0x0000
+TIMING-204-US                            ::= 0x0001
+TIMING-332-US                            ::= 0x0002
+TIMING-588-US                            ::= 0x0003
+TIMING-1100-US                           ::= 0x0004 // Default
+TIMING-2100-US                           ::= 0x0005
+TIMING-4200-US                           ::= 0x0006
+TIMING-8300-US                           ::= 0x0007
+
+// 'Measure Mode' (includes OFF)
+MODE-POWER-DOWN                          ::= 0x0000
+MODE-TRIGGERED                           ::= 0x0003
+MODE-CONTINUOUS                          ::= 0x0007
 
 /**
 Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/ 
@@ -108,46 +151,6 @@ $DEFAULT-I2C-ADDRESS ($ hotlinks to code location!)  Used for parameters
 */
 
 
-// DEFAULT-I2C-ADDRESS is 64 with jumper defaults.
-// Valid address values: 64 to 79 - See datasheet table 6-2
-DEFAULT-I2C-ADDRESS                      ::= 0x40
-
-// Constants to be used by users during configuration
-
-// Alert Types that can set off the alert register and/or alert pin.
-ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
-ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
-ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
-ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
-ALERT-POWER-OVER                         ::= 0x0800
-ALERT-CURRENT-OVER                       ::= 0xFFFE
-ALERT-CURRENT-UNDER                      ::= 0xFFFF
-ALERT-CONVERSION-READY                   ::= 0x0400
-
-// AVERAGE SAMPLE SIZE ENUM 
-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
-AVERAGE-4-SAMPLES                        ::= 0x0001
-AVERAGE-16-SAMPLES                       ::= 0x0002
-AVERAGE-64-SAMPLES                       ::= 0x0003
-AVERAGE-128-SAMPLES                      ::= 0x0004
-AVERAGE-256-SAMPLES                      ::= 0x0005
-AVERAGE-512-SAMPLES                      ::= 0x0006
-AVERAGE-1024-SAMPLES                     ::= 0x0007
-
-// BVCT and SVCT conversion timing ENUM
-TIMING-140-US                            ::= 0x0000
-TIMING-204-US                            ::= 0x0001
-TIMING-332-US                            ::= 0x0002
-TIMING-588-US                            ::= 0x0003
-TIMING-1100-US                           ::= 0x0004 // Default
-TIMING-2100-US                           ::= 0x0005
-TIMING-4200-US                           ::= 0x0006
-TIMING-8300-US                           ::= 0x0007
-
-// 'Measure Mode' (includes OFF)
-MODE-POWER-DOWN                          ::= 0x0000
-MODE-TRIGGERED                           ::= 0x0003
-MODE-CONTINUOUS                          ::= 0x0007
 
 class Driver:
   // Core Register Addresses
@@ -257,39 +260,6 @@ class Driver:
     // NOTE:  Using this helper function, the actual values used in the calculations are visible
     if debug_: print-diagnostics
 
-    // Testing of functions
-    /*if debug_:
-      print "Test load-current --amps      :$(load-current --amps)"
-      print "Test load-current --milliamps :$(load-current --milliamps)"
-      val1 := ?
-      val1 = manufacturer-id
-      val1 = die-id
-      val1 = die-id --rid
-      val1 = die-id --did
-      busy
-      print "*      : single-measurement --nowait "
-      measure-mode   --mode=MODE-TRIGGERED
-      sampling-rate  --rate=AVERAGE-256-SAMPLES
-      print "*      : single-measurement"
-      single-measurement
-      print "*      :                             ... done"
-      
-      conversion-ready --enable-alert-pin
-      alert-latch --enable
-      alert-pin-polarity --inverted
-      val1 = conversion-ready
-
-      set-alert --type=ALERT-BUS-OVER-VOLTAGE --limit=3.5
-      val1 = alert-limit
-      conversion-ready --enable-alert-pin
-      alert-latch --disable
-      val1 = alert-latch
-      alert-pin-polarity --normal
-      val1 = alert-pin-polarity
-      sampling-rate  --rate=AVERAGE-256-SAMPLES
-      measure-mode   --mode=MODE-CONTINUOUS
-  */
-
   // Reset Device
   // NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears
   reset_ -> none:
@@ -313,24 +283,21 @@ class Driver:
       print "*      : calibration-value CHECKED changed from $(old-value) to $(checked-value)"
 
 
-  // Get Calibration Value
-  //
+  /** Get Calibration Value */
   calibration-value -> int:
     register := reg_.read-u16-be REGISTER-CALIBRATION_
     if debug_: print "*      : calibration-value retrieved $(register)"
     return register
 
-  // Adjust Calibration Value by Factor
-  // NOTE:  Retrieves and adjusted calibration value by a factor
-  //
+  /** Adjust Calibration Value by Factor
+  NOTE:  Retrieves and adjusted calibration value by a factor */
   calibration-value --factor/int -> none:
     oldCalibrationValue := calibration-value
     newCalibrationValue := oldCalibrationValue * factor
     calibration-value --value=newCalibrationValue
     if debug_: print "*      : calibration-value factor $(factor) adjusts from $(oldCalibrationValue) to $(newCalibrationValue)"
 
-  // Adjust Sampling Rate for measurements
-  //
+  /** Adjust Sampling Rate for measurements */
   sampling-rate --rate/int -> none:
     oldMask/int  := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int  := oldMask
@@ -339,8 +306,7 @@ class Driver:
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     if debug_: print "*      : sampling-rate set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
-  // Retrieve current sampling rate code/enum value
-  // 
+  /** Retrieve current sampling rate code/enum value */
   sampling-rate --code -> int:
     mask := reg_.read-u16-be REGISTER-CONFIG_
     return ((mask & CONF-AVERAGE-MASK_) >> 9)
