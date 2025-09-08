@@ -356,17 +356,6 @@ class Driver:
   // Set resistor and current range, independently 
   // NOTE:  Resistor value in ohm, Current range in A
   // 
-  resistor-range-old --resistor/float --max-current/float -> none:
-    shunt-resistor_        = resistor                             // Cache to class-wide for later use
-    max-current_           = max-current                          // Cache to class-wide for later use
-    current-LSB_           = (max-current / 32768.0)     // A per bit (LSB)
-    if debug_: print "*      : resistor-range: current per bit = $(current-LSB_)A"
-    calibrationValue   := 0.00512 / (current-LSB_ * resistor)
-    if debug_: print "*      : resistor-range: calibration value becomes = $(calibrationValue)"
-    calibration-value --value=(calibrationValue).round
-    power-multiplier_mw_   = 1000.0 * 25.0 * current-LSB_
-    // TODO: Check for accuracy on the to-int
-
   resistor-range --resistor/float --max-current/float -> none:
     shunt-resistor_        = resistor                                              // Cache to class-wide for later use
     max-current_           = max-current                                           // Cache to class-wide for later use
@@ -377,7 +366,7 @@ class Driver:
     calibration-value --value=(calibrationValue).round
     current-divider-ma_    = 0.001 / current-LSB_
     power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
-    print "(32767 * current-LSB_ is $(32767 * current-LSB_) compared to $(max-current_)"
+    if debug_: print "(32767 * current-LSB_ is $(32767 * current-LSB_) compared to $(max-current_)"
     // Check manually if necessary: assert: (32767 * current-LSB_ >= max-current_)
 
   resistor-range --resistor/float -> none:
