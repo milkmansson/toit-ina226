@@ -6,8 +6,6 @@ import binary
 import serial.device as serial
 import serial.registers as registers
 
-
-
 // DEFAULT-I2C-ADDRESS is 64 with jumper defaults.
 // Valid address values: 64 to 79 - See datasheet table 6-2
 DEFAULT-I2C-ADDRESS                      ::= 0x40
@@ -53,7 +51,7 @@ MODE-CONTINUOUS                          ::= 0x0007
 Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/ 
 There are others with different feature sets and may be partially code compatible.
 
-# Simplest Use Case
+# Use Case 1: Simple Continuous Measurement 
 Simplest use case assumes an unmodified module with default wiring guidelines followed.  (Please see the Readme for pointers & guidance.) Assumes:
  - Module shunt resistor value R100 (0.1 Ohm)
  - Sample size of 1 (eg, no averaging)
@@ -80,8 +78,7 @@ main:
     print "$(%0.4f (ina226driver.load-power --watts))w"
     sleep --ms=500
 ```
-
-# Use Case: Measuring Very Small Currents
+# Use Case 2: Measuring Very Small Currents
 In this case the task is to measure tiny standby or sleep currents in the milliamp range.  The default shunt resistor is replaced with a larger value resistor (e.g. 1.0 Ω).  This increases the voltage drop per milliamp, giving the INA226 finer resolution for small loads. [The trade-off is that the maximum measurable current shrinks to about 80 mA (since the INA226 input saturates at ~81.92 mV), and more power is dissipated in the shunt as heat.]
 ```
 import gpio
@@ -108,8 +105,7 @@ main:
     sleep --ms=500
 
 ```
-
-# Use Case: Balancing Update Speed vs. Accuracy in a Battery-Powered Scenario
+# Use Case 3: Balancing Update Speed vs. Accuracy in a Battery-Powered Scenario
 Where the module must be wired into a solution running on a battery. The INA226 is used to monitor the node’s power draw to be able to estimate battery life.  The driver runs in continuous conversion mode by default, sampling all the time at relatively short conversion times.  This has a higher power requirement as the INA226 is constantly awake and operating.  
 In this case the driver needs to use triggered (single-shot) mode with longer conversion times and averaging enabled. 
 ```
@@ -144,13 +140,9 @@ main:
 
 */
 
-/** 
-
+/*
 $DEFAULT-I2C-ADDRESS ($ hotlinks to code location!)  Used for parameters
-
 */
-
-
 
 class Driver:
   // Core Register Addresses
@@ -181,34 +173,38 @@ class Driver:
   static CONF-MODE-OFFSET_               ::= 0
 
   //  Get Alert Flag
-  static ALERT-CONVERSION-READY-FLAG_    ::= 0x0008
-  static ALERT-CONVERSION-READY-OFFSET_  ::= 3
-  static ALERT-CONVERSION-READY-LENGTH_  ::= 1
-  static ALERT-FUNCTION-FLAG_            ::= 0x0010
-  static ALERT-FUNCTION-OFFSET_          ::= 4
-  static ALERT-FUNCTION-LENGTH_          ::= 1
-  static ALERT-MATH-OVERFLOW-FLAG_       ::= 0x0004
-  static ALERT-MATH-OVERFLOW-OFFSET_     ::= 2
-  static ALERT-MATH-OVERFLOW-LENGTH_     ::= 1
-  static ALERT-PIN-POLARITY-BIT_         ::= 0x0002
-  static ALERT-PIN-POLARITY-OFFSET_      ::= 1
-  static ALERT-PIN-POLARITY-LENGTH_      ::= 1
-  static ALERT-LATCH-ENABLE-BIT_         ::= 0x0001
-  static ALERT-LATCH-ENABLE-OFFSET_      ::= 0
-  static ALERT-LATCH-ENABLE-LENGTH_      ::= 1
-  static CONVERSION-READY-BIT_           ::= 0x0800
-  static CONVERSION-READY-OFFSET_        ::= 10
-  static CONVERSION-READY-LENGTH_        ::= 1
+  static ALERT-CONVERSION-READY-FLAG_             ::= 0x0008
+  static ALERT-CONVERSION-READY-OFFSET_           ::= 3
+  static ALERT-CONVERSION-READY-LENGTH_           ::= 1
+  static ALERT-FUNCTION-FLAG_                     ::= 0x0010
+  static ALERT-FUNCTION-OFFSET_                   ::= 4
+  static ALERT-FUNCTION-LENGTH_                   ::= 1
+  static ALERT-MATH-OVERFLOW-FLAG_                ::= 0x0004
+  static ALERT-MATH-OVERFLOW-OFFSET_              ::= 2
+  static ALERT-MATH-OVERFLOW-LENGTH_              ::= 1
+  static ALERT-PIN-POLARITY-BIT_                  ::= 0x0002
+  static ALERT-PIN-POLARITY-OFFSET_               ::= 1
+  static ALERT-PIN-POLARITY-LENGTH_               ::= 1
+  static ALERT-LATCH-ENABLE-BIT_                  ::= 0x0001
+  static ALERT-LATCH-ENABLE-OFFSET_               ::= 0
+  static ALERT-LATCH-ENABLE-LENGTH_               ::= 1
+  static CONVERSION-READY-BIT_                    ::= 0x0800
+  static CONVERSION-READY-OFFSET_                 ::= 10
+  static CONVERSION-READY-LENGTH_                 ::= 1
 
-  debug_/bool                            := false
-  reg_/registers.Registers               := ?  
-  current-divider-ma_/float              := 0.0
-  power-multiplier-mw_/float             := 0.0
-  last-measure-mode_/int                 := MODE-CONTINUOUS
-  current-LSB_/float                     := 0.0
-  shunt-resistor_/float                  := 0.0
-  current-range_/float                   := 0.0
-  correction-factor-a_/float             := 0.0
+  static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
+  static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 81.92  // millivolts
+
+  debug_/bool                                     := false
+  reg_/registers.Registers                        := ?  
+  current-divider-ma_/float                       := 0.0
+  power-multiplier-mw_/float                      := 0.0
+  last-measure-mode_/int                          := MODE-CONTINUOUS
+  current-LSB_/float                              := 0.0
+  shunt-resistor_/float                           := 0.0
+  current-range_/float                            := 0.0
+  correction-factor-a_/float                      := 0.0
+  max-current_/float                              := 0.0
 
   constructor dev/serial.Device --debug/bool=false:
     reg_ = dev.registers
@@ -230,7 +226,7 @@ class Driver:
     //        left this hack (feature) in to allow a correction factor for values 
     //        match up with voltmeter. Before using the library, verify this value
     //        matches measurements IRL. 
-    correction-factor-a_ = 100.0
+    correction-factor-a_ = 1.0
 
     // NOTE:  The Current Register (04h) and Power Register (03h) default to '0' 
     //        because the Calibration register defaults to '0', yielding zero current
@@ -250,7 +246,7 @@ class Driver:
     //        current range is set to 0.800a - eg 800ma.
     // NOTE:  Whilst not documented well for newbies like me, I assumed the resistor value
     //        needs to match the one on the board.  Mine is R100, which I assumed 0.1 Ohm.
-    resistor-range --resistor=0.100 --current-range=0.8
+    resistor-range --resistor=0.100 // --current-range=0.8
     
     // NOTE:  Performing a single measurement here assists with accuracy for initial
     //        measurements.
@@ -271,10 +267,16 @@ class Driver:
        after-value := reg_.read-u16-be REGISTER-CONFIG_
        print "*      : reset - 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
 
-  // Set Calibration Value 
-  // NOTE:  Replaces calibration value outright
+  /** Get Calibration Value */
+  calibration-value -> int:
+    register := reg_.read-u16-be REGISTER-CALIBRATION_
+    if debug_: print "*      : calibration-value retrieved $(register)"
+    return register
+
+  // Set Calibration Value - outright
   calibration-value --value/int -> none:
-    assert: ((value >= 1500) and (value <= 3000))  // sanity check
+    if debug_: print "*      : calibration-value         $(value) requested"
+    //assert: ((value >= 1500) and (value <= 3000))  // sanity check
     old-value := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
     if debug_: 
@@ -282,15 +284,7 @@ class Driver:
       checked-value/int := calibration-value
       print "*      : calibration-value CHECKED changed from $(old-value) to $(checked-value)"
 
-
-  /** Get Calibration Value */
-  calibration-value -> int:
-    register := reg_.read-u16-be REGISTER-CALIBRATION_
-    if debug_: print "*      : calibration-value retrieved $(register)"
-    return register
-
-  /** Adjust Calibration Value by Factor
-  NOTE:  Retrieves and adjusted calibration value by a factor */
+  /** Set Calibration Value - by a factor */
   calibration-value --factor/int -> none:
     oldCalibrationValue := calibration-value
     newCalibrationValue := oldCalibrationValue * factor
@@ -362,20 +356,34 @@ class Driver:
   // Set resistor and current range, independently 
   // NOTE:  Resistor value in ohm, Current range in A
   // 
-  resistor-range --resistor/float --current-range/float -> none:
-    shunt-resistor_        = resistor                               // Cache to class-wide for later use
-    current-range_         = current-range
-    current-LSB_           = (current_range / 32768.0)     // A per bit (LSB)
+  resistor-range-old --resistor/float --max-current/float -> none:
+    shunt-resistor_        = resistor                             // Cache to class-wide for later use
+    max-current_           = max-current                          // Cache to class-wide for later use
+    current-LSB_           = (max-current / 32768.0)     // A per bit (LSB)
     if debug_: print "*      : resistor-range: current per bit = $(current-LSB_)A"
     calibrationValue   := 0.00512 / (current-LSB_ * resistor)
     if debug_: print "*      : resistor-range: calibration value becomes = $(calibrationValue)"
-    calibration-value --value=(calibrationValue).to-int
-    current-divider_ma_    = 0.001 / current-LSB_
+    calibration-value --value=(calibrationValue).round
     power-multiplier_mw_   = 1000.0 * 25.0 * current-LSB_
     // TODO: Check for accuracy on the to-int
 
+  resistor-range --resistor/float --max-current/float -> none:
+    shunt-resistor_        = resistor                                              // Cache to class-wide for later use
+    max-current_           = max-current                                           // Cache to class-wide for later use
+    current-LSB_           = (max-current_ / 32768.0)                              // Amps per bit (LSB)
+    if debug_: print "*      : resistor-range: current per bit = $(current-LSB_)A"
+    calibrationValue      := INTERNAL_SCALING_VALUE_ / (current-LSB_ * resistor)
+    if debug_: print "*      : resistor-range: calibration value becomes = $(calibrationValue) $((calibrationValue).round)[rounded]"
+    calibration-value --value=(calibrationValue).round
+    current-divider-ma_    = 0.001 / current-LSB_
+    power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
+    print "(32767 * current-LSB_ is $(32767 * current-LSB_) compared to $(max-current_)"
+    // Check manually if necessary: assert: (32767 * current-LSB_ >= max-current_)
+
   resistor-range --resistor/float -> none:
-    resistor-range --resistor=resistor --current-range=current-range_
+    // Current range - max measurable current given the shunt resistor
+    current-max/float := ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/resistor
+    resistor-range --resistor=resistor --max-current=current-max
 
   // MEASUREMENT FUNCTIONS
 
