@@ -896,11 +896,3 @@ class Driver:
     outStr = outStr.pad --left 16 '0'
     outStr = "$(outStr[0..4]).$(outStr[4..8]).$(outStr[8..12]).$(outStr[12..16])"
     return outStr
-
-/*
-
-void WE::setCurrentRange(CURRENT-RANGE range){ // deprecated, left for downward compatibility
-    deviceCurrentRange = range    
-}
-
-*/
