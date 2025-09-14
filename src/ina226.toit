@@ -251,7 +251,7 @@ class Driver:
     wait-until-conversion-completed
     
     // NOTE:  Using this helper function, the actual values used in the calculations are visible
-    print-diagnostics
+    // print-diagnostics
 
   // Reset Device
   // NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears
@@ -442,7 +442,7 @@ class Driver:
         if curWaitTimeMs >= maxWaitTimeMs:
           logger_.debug "waitUntilConversionCompleted: maxWaitTime $(maxWaitTimeMs)ms exceeded - breaking"
           break
-    logger_.debug " waitUntilConversionCompleted: waited $(curWaitTimeMs)ms of max $(maxWaitTimeMs)ms"
+    //logger_.debug " waitUntilConversionCompleted: waited $(curWaitTimeMs)ms of max $(maxWaitTimeMs)ms"
 
   // Single Measurement - wait for completion
   //
