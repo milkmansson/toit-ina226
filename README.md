@@ -138,7 +138,7 @@ So, once calibrated, it can always be checked by:
 - Power: proportional to raw counts × 25 × I(LSB).
 
 ## Changing the Shunt Resistor
-Many cheap INA226 modules ship with 0.1 Ω or 0.01 Ω shunts, optimized for hobbyist ranges (1–3 A).
+Many cheap INA226 modules ship with 0.1 Ω or 0.01 Ω shunts.
 - For high-current applications (tens of amps), the shunt can be replaced with a much smaller value (e.g. 1–5 mΩ). This reduces voltage drop and wasted power, and raises the maximum measurable current, but makes the resolution for tiny currents coarser.
 - For low-current applications (milliamps), a larger shunt (e.g. 0.5–1.0 Ω) increases sensitivity and resolution, but lowers the maximum measurable current (≈80 mA with a 1 Ω shunt) and burns more power in the resistor itself.
 **IMPORTANT:** Always update the calibration constant in the code after changing the shunt. The INA226 does not store these values permanently.
@@ -151,5 +151,5 @@ One would assume you are here because you know what Toit is.  If you dont:
   - https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor (English)
   - https://wolles-elektronikkiste.de/ina226 (German)
 - Rob Tillaart's work [here](https://github.com/RobTillaart/INA226) which helped me understand and correct the work
-- Florian Loitsch and for the tireless help and encouragement
+- [Florian](https://github.com/floitsch) for the tireless help and encouragement
 - The wider Toit developer team (past and present) for a truly excellent product

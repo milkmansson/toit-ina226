@@ -2,6 +2,7 @@
 // Use of this source code is governed by an MIT-style license that can be
 // found in the package's LICENSE file.
 
+import log
 import binary
 import serial.device as serial
 import serial.registers as registers
@@ -195,7 +196,6 @@ class Driver:
   static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
   static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 81.92  // millivolts
 
-  debug_/bool                                     := false
   reg_/registers.Registers                        := ?  
   current-divider-ma_/float                       := 0.0
   power-multiplier-mw_/float                      := 0.0
@@ -205,21 +205,18 @@ class Driver:
   current-range_/float                            := 0.0
   correction-factor-a_/float                      := 0.0
   max-current_/float                              := 0.0
+  logger_/log.Logger                              := ?
 
-  constructor dev/serial.Device --debug/bool=false:
+  constructor dev/serial.Device --logger/log.Logger=(log.default.with-name "ina226"):
+    logger_ = logger
     reg_ = dev.registers
     initialise-device_
-  
-  debug-mode --enable -> none:
-    debug_ = true
-
-  debug-mode --disable -> none:
-    debug_ = false
 
   // CONFIGURATION FUNCTIONS
 
   // Initial Device Configuration
   initialise-device_ -> none:
+    // Maybe not reuiqred but the manual suggests you should do it
     reset_
 
     // NOTE:  Found an error by factor 100 and couldn't figure this out in any way
@@ -254,7 +251,7 @@ class Driver:
     wait-until-conversion-completed
     
     // NOTE:  Using this helper function, the actual values used in the calculations are visible
-    if debug_: print-diagnostics
+    print-diagnostics
 
   // Reset Device
   // NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears
@@ -263,33 +260,29 @@ class Driver:
     new-value := old-value | CONF-RESET-MASK_
     reg_.write-u16-be REGISTER-CONFIG_ new-value
     sleep --ms=(estimated-conversion-time --ms)
-    if debug_:
-       after-value := reg_.read-u16-be REGISTER-CONFIG_
-       print "*      : reset - 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
+    after-value := reg_.read-u16-be REGISTER-CONFIG_
+    log.info "reset: 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
 
   /** Get Calibration Value */
   calibration-value -> int:
     register := reg_.read-u16-be REGISTER-CALIBRATION_
-    if debug_: print "*      : calibration-value retrieved $(register)"
+    logger_.debug "calibration-value: retrieved $(register)"
     return register
 
   // Set Calibration Value - outright
   calibration-value --value/int -> none:
-    if debug_: print "*      : calibration-value         $(value) requested"
+    logger_.debug "Calibration-value $(value) requested"
     //assert: ((value >= 1500) and (value <= 3000))  // sanity check
     old-value := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
-    if debug_: 
-      print "*      : calibration-value         changed from $(old-value) to $(value)"
-      checked-value/int := calibration-value
-      print "*      : calibration-value CHECKED changed from $(old-value) to $(checked-value)"
+    logger_.debug "calibration-value: changed from $(old-value) to $(value)"
 
   /** Set Calibration Value - by a factor */
   calibration-value --factor/int -> none:
     oldCalibrationValue := calibration-value
     newCalibrationValue := oldCalibrationValue * factor
     calibration-value --value=newCalibrationValue
-    if debug_: print "*      : calibration-value factor $(factor) adjusts from $(oldCalibrationValue) to $(newCalibrationValue)"
+    logger_.debug "caibration-value: factor $(factor) adjusts from $(oldCalibrationValue) to $(newCalibrationValue)"
 
   /** Adjust Sampling Rate for measurements */
   sampling-rate --rate/int -> none:
@@ -298,7 +291,7 @@ class Driver:
     newMask      &= ~(CONF-AVERAGE-MASK_)
     newMask      |= (rate << 9)
     reg_.write-u16-be REGISTER-CONFIG_ newMask
-    if debug_: print "*      : sampling-rate set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
+    logger_.debug "sampling-rate: set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
   /** Retrieve current sampling rate code/enum value */
   sampling-rate --code -> int:
@@ -326,7 +319,7 @@ class Driver:
     newMask     &= ~CONF-BUSVC-MASK_
     newMask     |= (bus << CONF-BUSVC-OFFSET_)
     reg_.write-u16-be REGISTER-CONFIG_ newMask
-    if debug_: print "*      : conversion-time --bus set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
+    logger_.debug "conversion-time: --bus set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
   
   conversion-time --shunt/int -> none:
     oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
@@ -334,7 +327,7 @@ class Driver:
     newMask     &= ~CONF-SHUNTVC-MASK_
     newMask     |= (shunt << CONF-SHUNTVC-OFFSET_)
     reg_.write-u16-be REGISTER-CONFIG_ newMask
-    if debug_: print "*      : conversion-time --shunt set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
+    logger_.debug "conversion-time: --shunt set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
   // Sets both to the same when one value is given
   conversion-time --time/int -> none:
@@ -350,7 +343,7 @@ class Driver:
     newMask     &= ~(CONF-MODE-MASK_)
     newMask     |= mode  //low value, no left shift offset
     reg_.write-u16-be REGISTER-CONFIG_ newMask
-    if debug_: print "*      : measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
+    logger_.debug "measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
     if (mode != MODE-POWER-DOWN): last-measure-mode_ = mode
 
   // Set resistor and current range, independently 
@@ -360,13 +353,13 @@ class Driver:
     shunt-resistor_        = resistor                                              // Cache to class-wide for later use
     max-current_           = max-current                                           // Cache to class-wide for later use
     current-LSB_           = (max-current_ / 32768.0)                              // Amps per bit (LSB)
-    if debug_: print "*      : resistor-range: current per bit = $(current-LSB_)A"
+    logger_.debug "resistor-range: current per bit = $(current-LSB_)A"
     calibrationValue      := INTERNAL_SCALING_VALUE_ / (current-LSB_ * resistor)
-    if debug_: print "*      : resistor-range: calibration value becomes = $(calibrationValue) $((calibrationValue).round)[rounded]"
+    logger_.debug "resistor-range: calibration value becomes = $(calibrationValue) $((calibrationValue).round)[rounded]"
     calibration-value --value=(calibrationValue).round
     current-divider-ma_    = 0.001 / current-LSB_
     power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
-    if debug_: print "(32767 * current-LSB_ is $(32767 * current-LSB_) compared to $(max-current_)"
+    logger_.debug "resistor-range: (32767 * current-LSB_ is $(32767 * current-LSB_) compared to $(max-current_)"
     // Check manually if necessary: assert: (32767 * current-LSB_ >= max-current_)
 
   resistor-range --resistor/float -> none:
@@ -437,8 +430,6 @@ class Driver:
   busy -> bool:
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_            // clears CNVR (Conversion Ready) Flag
     val/bool     :=  ((register & ALERT-CONVERSION-READY-FLAG_) == 0)
-    // if debug_: print "*      : busy compares  reg:val                              $(bits-16 register) to $(bits-16 ALERT-CONVERSION-READY-FLAG)"
-    // if debug_: print "*      : busy returns $(val)"
     return val
 
   wait-until-conversion-completed -> none:
@@ -446,13 +437,12 @@ class Driver:
     curWaitTimeMs/int   := 0
     sleepIntervalMs/int := 50
     while busy:                                                               // checks if sampling is completed
-        // if debug_: print "*      : waitUntilConversionCompleted waiting $(curWaitTimeMs)ms of max $(maxWaitTimeMs)ms"
         sleep --ms=sleepIntervalMs
         curWaitTimeMs += sleepIntervalMs
         if curWaitTimeMs >= maxWaitTimeMs:
-          if debug_: print "*      : waitUntilConversionCompleted maxWaitTime $(maxWaitTimeMs)ms exceeded - breaking"
+          logger_.debug "waitUntilConversionCompleted: maxWaitTime $(maxWaitTimeMs)ms exceeded - breaking"
           break
-    if debug_: print "*      : waitUntilConversionCompleted waited $(curWaitTimeMs)ms of max $(maxWaitTimeMs)ms"
+    logger_.debug " waitUntilConversionCompleted: waited $(curWaitTimeMs)ms of max $(maxWaitTimeMs)ms"
 
   // Single Measurement - wait for completion
   //
@@ -496,8 +486,8 @@ class Driver:
     else if type == ALERT-POWER-OVER:
       alertLimit = limit / power-multiplier-mw_
     else:
-      if debug_: print "*      : set-alert unexpected alert type"
-      throw "set-alert unexpected alert type"
+      logger_.debug "set-alert: unexpected alert type"
+      throw "set-alert: unexpected alert type"
     
     // Set Alert Type Flag
     oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
@@ -505,12 +495,11 @@ class Driver:
     newMask     &= ~(0xF800)    // clear old alert values (bits D11 to D15) - only one alert allowed at once
     newMask     |= type         // already bit shifted in the mask constants!
     reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
-    // if debug_: print "*      : set-alert mask set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
-    if debug_: print "*      : set-alert mask                                      $(bits-16 oldMask) to $(bits-16 newMask)"
+    logger_.debug "set-alert: mask $(bits-16 oldMask) to $(bits-16 newMask)"
 
     // Set Alert Limit Value
     reg_.write-u16-be REGISTER-ALERT-LIMIT_ (alertLimit).to-int
-    if debug_: print "*      : set-alert alert limit set to $(alertLimit)"
+    logger_.debug "set-alert: alert limit set to $(alertLimit)"
 
   // Alert "Latching"
   // NOTE:  When the Alert Latch Enable bit is set to Transparent mode, the Alert 
@@ -528,8 +517,7 @@ class Driver:
     newMask     &= ~(ALERT-LATCH-ENABLE-BIT_)
     newMask     |= (set << ALERT-LATCH-ENABLE-OFFSET_)
     reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
-    // if debug_: print "*      : alert-latch enable set from 0x$(%01x oldMask) to 0x$(%01x newMask)"
-    if debug_: print "*      : alert-latch alert-pin $(set) is                          $(bits-16 oldMask) to $(bits-16 newMask)"
+    logger_.debug "alert-latch alert-pin $(set) is $(bits-16 oldMask) to $(bits-16 newMask)"
 
   // Human readable alias for setting alert latching
   //
@@ -548,7 +536,7 @@ class Driver:
     latch/bool := false
     latchBit/int := ((mask & ALERT-LATCH-ENABLE-BIT_) >> ALERT-LATCH-ENABLE-OFFSET_) & ALERT-LATCH-ENABLE-LENGTH_
     if latchBit == 1: latch = true
-    if debug_: print "*      : alert-latch is is $(latchBit) [$(latch)]"
+    logger_.debug "alert-latch: is is $(latchBit) [$(latch)]"
     return latch
   
   // Alert pin polarity functions
@@ -563,8 +551,7 @@ class Driver:
     newMask     &= ~(ALERT-PIN-POLARITY-BIT_)
     newMask     |= (set << ALERT-PIN-POLARITY-OFFSET_)
     reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
-    //if debug_: print "*      : alert-pin-polarity enable set from 0x$(%01x oldMask) to 0x$(%01x newMask)"
-    if debug_: print "*      : alert-pin-polarity alert-pin $(set) is                   $(bits-16 oldMask) to $(bits-16 newMask)"
+    logger_.debug "alert-pin-polarity: alert-pin $(set) is $(bits-16 oldMask) to $(bits-16 newMask)"
 
   // Human readable alias for setting alert pin polarity
   alert-pin-polarity --inverted -> none:  alert-pin-polarity --set=1
@@ -578,7 +565,7 @@ class Driver:
     polarityInverted/bool := false
     polarityInvertedBit/int := ((oldMask & ALERT-PIN-POLARITY-BIT_) >> ALERT-PIN-POLARITY-OFFSET_) & ALERT-PIN-POLARITY-LENGTH_
     if polarityInvertedBit == 1: polarityInverted = true
-    if debug_: print "*      : alert-pin-polarity is $(polarityInvertedBit) [$(polarityInverted)]"
+    logger_.debug "alert-pin-polarity: is $(polarityInvertedBit) [$(polarityInverted)]"
     return polarityInverted
 
   // Alerts
@@ -591,12 +578,12 @@ class Driver:
   // NOTE:  done this way so that during debugging mode, the exact alert that triggered will be shown
   //        (more reads) whereas without debug mode, one read would suffice.
   alert -> bool:
-    if debug_: 
-      return overflow-alert or limit-alert or conversion-ready-alert
-    else:
-      register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-      checkMask    := ALERT-MATH-OVERFLOW-FLAG_ | ALERT-FUNCTION-FLAG_ | ALERT-CONVERSION-READY-FLAG_
-      return (register & checkMask) != 0
+    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
+    if (register & ALERT-MATH-OVERFLOW-FLAG_) != 0: logger_.debug "alert: ALERT-MATH-OVERFLOW-FLAG_"
+    if (register & ALERT-FUNCTION-FLAG_) != 0: logger_.debug "alert: ALERT-FUNCTION-FLAG_"
+    if (register & ALERT-CONVERSION-READY-FLAG_) != 0: logger_.debug "alert: ALERT-CONVERSION-READY-FLAG_"
+    checkMask    := ALERT-MATH-OVERFLOW-FLAG_ | ALERT-FUNCTION-FLAG_ | ALERT-CONVERSION-READY-FLAG_
+    return (register & checkMask) != 0
 
   // clear alerts
   alert --clear -> none:
@@ -608,7 +595,7 @@ class Driver:
     overflow := false
     overflowBit := ((register & ALERT-MATH-OVERFLOW-FLAG_) >> ALERT-MATH-OVERFLOW-OFFSET_ ) & ALERT-MATH-OVERFLOW-LENGTH_
     if overflowBit == 1: overflow = true
-    if debug_: print "*      : alert: overflow bit is $(overflowBit) [$(overflow)]"
+    logger_.debug "overflow-alert: overflow bit is $(overflowBit) [$(overflow)]"
     return overflow
 
   limit-alert      -> bool:
@@ -616,7 +603,7 @@ class Driver:
     overflow := false
     overflowBit := ((register & ALERT-FUNCTION-FLAG_) >> ALERT-FUNCTION-OFFSET_ ) & ALERT-FUNCTION-LENGTH_
     if overflowBit == 1: overflow = true
-    if debug_: print "*      : alert: configured limit bit is $(overflowBit) [$(overflow)]"
+    logger_.debug "limit-alert: configured limit bit is $(overflowBit) [$(overflow)]"
     return overflow
 
   // Determine If Conversion is Complete
@@ -634,7 +621,7 @@ class Driver:
     conversionReady := false
     conversionReadyBit := ((register & ALERT-CONVERSION-READY-FLAG_) >> ALERT-CONVERSION-READY-OFFSET_ ) & ALERT-CONVERSION-READY-LENGTH_
     if conversionReadyBit == 1: conversionReady = true
-    if debug_: print "*      : alert: conversion ready bit is $(conversionReadyBit) [$(conversionReady)]"
+    logger_.debug "conversion-ready-alert: conversion ready bit is $(conversionReadyBit) [$(conversionReady)]"
     return conversionReady
 
   // Alias for alert-conversion-ready
@@ -651,7 +638,7 @@ class Driver:
     newMask     &= ~(CONVERSION-READY-BIT_)
     newMask     |= (set << CONVERSION-READY-OFFSET_) // already bit shifted
     reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
-    if debug_: print "*      : conversion-ready alert-pin $(set) is                     $(bits-16 oldMask) to $(bits-16 newMask)"
+    logger_.debug "conversion-ready: alert-pin $(set) is $(bits-16 oldMask) to $(bits-16 newMask)"
 
   // Helpful alias for setting 'conversion-ready' on alert pin
   //
@@ -719,7 +706,7 @@ class Driver:
     totalms := ((totalus + 999) / 1000).to-int  // ceil
     if totalms < 1: totalms = 1
 
-    if debug_: print "*      : estimated-conversion-time --ms is: $(totalms)ms"
+    logger_.debug "estimated-conversion-time: --ms is: $(totalms)ms"
     return totalms
 
   // INFORMATION FUNCTIONS
@@ -729,7 +716,7 @@ class Driver:
   //
   manufacturer-id -> int:
     manid := reg_.read-u16-be REGISTER-MANUF-ID_
-    if debug_: print "*      : manufacturer-id is 0x$(%04x manid) [$(manid)]"
+    logger_.debug "manufacturer-id: is 0x$(%04x manid) [$(manid)]"
     return manid
   
   // Device ID Bits
@@ -738,7 +725,7 @@ class Driver:
   device-identification -> int:
     register := reg_.read-u16-be REGISTER-DIE-ID_
     dieidDid := (register & DIE-ID-DID-MASK_) >> 4
-    if debug_: print "*      : die-id DID is      0x$(%04x dieidDid) [$(dieidDid)]"
+    logger_.debug "device-identification: is 0x$(%04x dieidDid) [$(dieidDid)]"
     return dieidDid
 
   // Die Revision ID Bits
@@ -747,7 +734,7 @@ class Driver:
   device-revision -> int:
     register := reg_.read-u16-be REGISTER-DIE-ID_
     dieidRid := (register & DIE-ID-RID-MASK_)
-    if debug_: print "*      : die-id RID is      0x$(%04x dieidRid) [$(dieidRid)]"
+    logger_.debug "device-revision: is 0x$(%04x dieidRid) [$(dieidRid)]"
     return dieidRid
 
   // TROUBLESHOOTING FUNCTIONS
@@ -786,7 +773,7 @@ class Driver:
     assert: currentEstimate > 0.0
 
     shuntResistorEstimate/float := shuntVoltage / currentEstimate
-    print "Infer shunt: Vload=$(loadVoltage) V  Vsh=$(shuntVoltage) V  Rload=$(loadResistor) Ohm  -> I=$(currentEstimate)A  Rsh_est=$(shuntResistorEstimate) Ohm"
+    logger_.debug "infer-shunt-resistor: Vload=$(loadVoltage) V  Vsh=$(shuntVoltage) V  Rload=$(loadResistor) Ohm  -> I=$(currentEstimate)A  Rsh_est=$(shuntResistorEstimate) Ohm"
     return shuntResistorEstimate
 
   // Determine shunt resistor value from known load
@@ -807,7 +794,7 @@ class Driver:
       
     shuntVoltage/float          := shuntVoltageSum / samples.to-float
     shuntResistorEstimate/float := shuntVoltage / loadCurrent
-    print "Infer shunt: Vsh=$(shuntVoltage)V  I_known=$(loadCurrent)A  -> Rsh_est=$(shuntResistorEstimate)Ω"
+    logger_.debug "infer-shunt-resistor: Vsh=$(shuntVoltage)V  I_known=$(loadCurrent)A  -> Rsh_est=$(shuntResistorEstimate)Ω"
     return shuntResistorEstimate
 
 
@@ -826,15 +813,15 @@ class Driver:
     loadVoltage/float := load-voltage --volts
     busLoadDelta/float := (busVoltage - loadVoltage).abs
   
-    if debug_: print "Bus = $(%0.8f busVoltage)V, Load = $(%0.8f loadVoltage)V, Delta = $(%0.8f busLoadDelta)V"
+    logger_.debug "verify-tied-bus-load: Bus = $(%0.8f busVoltage)V, Load = $(%0.8f loadVoltage)V, Delta = $(%0.8f busLoadDelta)V"
     if busLoadDelta < 0.01:       // <10 mV difference
-      if debug_: print " Bus and load values appear the same (tied?)     Delta=$(%0.8f busLoadDelta)V"
+      logger_.debug "verify-tied-bus-load: Bus and load values appear the same (tied?)     Delta=$(%0.8f busLoadDelta)V"
       return true
     else if busLoadDelta < 0.05:  // 10–50 mV: maybe wiring drop
-      if debug_: print " Bus/load differ slightly (check traces/wiring)  Delta=$(%0.8f busLoadDelta)V"
+      logger_.debug "verify-tied-bus-load: Bus/load differ slightly (check traces/wiring)  Delta=$(%0.8f busLoadDelta)V"
       return false
     else:
-      if debug_: print " Bus and load differ significantly (not tied)    Delta=$(%0.8f busLoadDelta)V"
+      logger_.debug "verify-tied-bus-load: Bus and load differ significantly (not tied)    Delta=$(%0.8f busLoadDelta)V"
       return false
 
   // Print Diagnostic Information
