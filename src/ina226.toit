@@ -1,4 +1,4 @@
-// Copyright (C) 2025 Ian
+// Copyright (C) 2025 Milkmansson
 // Use of this source code is governed by an MIT-style license that can be
 // found in the package's LICENSE file.
 
@@ -49,8 +49,7 @@ MODE-TRIGGERED                           ::= 0x0003
 MODE-CONTINUOUS                          ::= 0x0007
 
 /**
-Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/ 
-There are others with different feature sets and may be partially code compatible.
+Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/.  There are others with different feature sets and may be partially code compatible.
 
 # Use Case 1: Simple Continuous Measurement 
 Simplest use case assumes an unmodified module with default wiring guidelines followed.  (Please see the Readme for pointers & guidance.) Assumes:
@@ -139,7 +138,6 @@ main:
     sleep --ms=60000 // Wait 1 Minute
 ```
 */
-
 
 class Driver:
   // Core Register Addresses
@@ -240,19 +238,16 @@ class Driver:
     // NOTE:  There appears to have been originally two constants/values for 'current range'
     //        MA_400 and MA_800 - I tested these and found that my voltmeter agreed when
     //        current range is set to 0.800a - eg 800ma.
-    // NOTE:  Whilst not documented well for newbies like me, I assumed the resistor value
-    //        needs to match the one on the board.  Mine is R100, which I assumed 0.1 Ohm.
     resistor-range --resistor=0.100 // --current-range=0.8
     
-    // NOTE:  Performing a single measurement here assists with accuracy for initial
-    //        measurements.
+    // NOTE:  Performing a single measurement here assists with accuracy for initial measurements.
     single-measurement
     wait-until-conversion-completed
     
     // NOTE:  Using this helper function, the actual values used in the calculations are visible
-    // print-diagnostics
+    //print-diagnostics
 
-  /** Reset Device
+  /** reset_: Reset Device
       NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears. */
   reset_ -> none:
     old-value := reg_.read-u16-be REGISTER-CONFIG_
@@ -262,25 +257,26 @@ class Driver:
     after-value := reg_.read-u16-be REGISTER-CONFIG_
     logger_.info "reset_: 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
 
-  /** Get Calibration Value */
+  /** calibration-value: Get Calibration Value */
   calibration-value -> int:
     return reg_.read-u16-be REGISTER-CALIBRATION_
 
-  /** Set Calibration Value - outright */
+  /** calibration-value --value: Set Calibration Value - outright */
   calibration-value --value/int -> none:
     //assert: ((value >= 1500) and (value <= 3000))  // sanity check
     old-value := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
     logger_.debug "calibration-value: changed from $(old-value) to $(value)"
 
-  /** Set Calibration Value - by a factor */
+  /** calibration-value --factor: Set Calibration Value - by a factor */
   calibration-value --factor/int -> none:
     oldCalibrationValue := calibration-value
     newCalibrationValue := oldCalibrationValue * factor
     calibration-value --value=newCalibrationValue
     logger_.debug "caibration-value: factor $(factor) adjusts from $(oldCalibrationValue) to $(newCalibrationValue)"
 
-  /** Adjust Sampling Rate for measurements */
+  /** sampling-rate --rate: Adjust Sampling Rate for measurements.  
+      Requires one of the values in the enum. */
   sampling-rate --rate/int -> none:
     oldMask/int  := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int  := oldMask
@@ -289,12 +285,12 @@ class Driver:
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     logger_.debug "sampling-rate: set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
-  /** Retrieve current sampling rate
+  /** sampling-rate --code: Retrieve current sampling rate
       This is the register code/enum value, not a rate of its own, needs conversion with $sampling-rate --count={enum} */
   sampling-rate --code -> int:
     return ((reg_.read-u16-be REGISTER-CONFIG_ & CONF-AVERAGE-MASK_) >> 9)
 
-  /** Return human readable sampling count number */
+  /** sampling-rate --count: Return human readable sampling count number */
   sampling-rate --count -> int:
     return sampling-rate-from-enum --code=(sampling-rate --code)
 
@@ -307,7 +303,7 @@ class Driver:
       - Shunt voltage = the tiny drop across your shunt resistor.
       - Current isn’t measured directly — it’s computed later from Vshunt/Rshunt */
 
-  /** conversion-time: (Overload) Sets conversion-time for bus only */  
+  /** conversion-time --bus: Sets conversion-time for bus only */  
   conversion-time --bus/int -> none:
     oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
@@ -316,7 +312,7 @@ class Driver:
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     logger_.debug "conversion-time: --bus set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
-  /** conversion-time: (Overload) Sets conversion-time for shunt only */  
+  /** conversion-time --shunt: Sets conversion-time for shunt only */  
   conversion-time --shunt/int -> none:
     oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
@@ -325,7 +321,7 @@ class Driver:
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     logger_.debug "conversion-time: --shunt set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
-  /** conversion-time: (Overload) Sets conversion-time for both to the same when only one value is given */
+  /** conversion-time --time: Sets conversion-time for both to the same when only one value is given */
   conversion-time --time/int -> none:
     conversion-time --shunt=time
     conversion-time --bus=time
@@ -341,7 +337,7 @@ class Driver:
     logger_.debug "measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
     if (mode != MODE-POWER-DOWN): last-measure-mode_ = mode
 
-  /** resistor-range: Set resistor and current range, independently 
+  /** resistor-range --resistor --max-current: Set resistor and current range, independently 
       Resistor value in ohm, Current range in A */
   resistor-range --resistor/float --max-current/float -> none:
     shunt-resistor_        = resistor                                              // Cache to class-wide for later use
@@ -356,6 +352,7 @@ class Driver:
     logger_.debug "resistor-range: (32767 * current-LSB_)=$(32767 * current-LSB_) compared to $(max-current_)"
     // Check manually if necessary: assert: (32767 * current-LSB_ >= max-current_)
 
+  /** resistor-range --resistor: Set resistor range manually */
   resistor-range --resistor/float -> none:
     // Current range - max measurable current given the shunt resistor
     current-max/float := ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/resistor
@@ -363,27 +360,32 @@ class Driver:
 
   // MEASUREMENT FUNCTIONS
 
+  /** shunt-current --amps: Return shunt current in amps */ 
   shunt-current --amps -> float:
     register   := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
     return (register * current-LSB_ * correction-factor-a_)
-  
+
+  /** shunt-current --milliamps: Return shunt current in milliamps */   
   shunt-current --milliamps -> float:   return ((shunt-current --amps) * 1000.0)
 
+  /** shunt-voltage --volts: Return shunt voltage in volts */   
   shunt-voltage --volts -> float:
     register := reg_.read-i16-be REGISTER-SHUNT-VOLTAGE_
     return (register * 0.0000025)
 
+  /** shunt-voltage --millivolts: Return shunt voltage in millivolts */  
   shunt-voltage --millivolts -> float:  return (shunt-voltage --volts) * 1000.0
   
-  /** supply-voltage: Upstream voltage, before the shunt (IN+).
+  /** supply-voltage --volts: Upstream voltage, before the shunt (IN+).
       This is the rail straight from the power source, minus any drop across the shunt. Since INA226 doesn’t have a dedicated pin for this, it can be reconstructed by: Vsupply = Vbus + Vshunt.   i.e. add the measured bus voltage (load side) and the measured shunt voltage. */
   supply-voltage --volts -> float:
     return ((bus-voltage --volts) + (shunt-voltage --volts))
 
+  /** supply-voltage --millivolts: see $supply-voltage --volts. */
   supply-voltage --millivolts -> float:
     return (supply-voltage --volts) * 1000.0
 
-  /** bus-voltage: whatever is wired to the VBUS pin.  
+  /** bus-voltage --volts: whatever is wired to the VBUS pin.  
       On most breakout boards, VBUS is tied internally to IN− (the low side of the shunt). So in practice, “bus voltage” usually means the voltage at the load side of the shunt.  This is what the load actually sees as its supply rail. */
   bus-voltage --volts -> float:
     register := reg_.read-i16-be REGISTER-BUS-VOLTAGE_
@@ -499,31 +501,25 @@ class Driver:
     reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
     logger_.debug "alert-latch alert-pin $(set) is $(bits-16 oldMask) to $(bits-16 newMask)"
 
-  // Human readable alias for setting alert latching
-  //
+  /** alert-latch: Human readable alias for enabling alert latching */
   alert-latch --enable -> none:
     alert-latch --set=1
 
-  // Human readable alias for setting alert latching
-  //
+  /** alert-latch: Human readable alias for disabling alert latching */
   alert-latch --disable -> none:
     alert-latch --set=0
 
-  // Retrieve Latch Configuration
-  //
+  /** alert-latch: Retrieve Latch Configuration */
   alert-latch -> bool:
     mask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     latch/bool := false
     latchBit/int := ((mask & ALERT-LATCH-ENABLE-BIT_) >> ALERT-LATCH-ENABLE-OFFSET_) & ALERT-LATCH-ENABLE-LENGTH_
     if latchBit == 1: latch = true
-    logger_.debug "alert-latch: is is $(latchBit) [$(latch)]"
     return latch
   
-  // Alert pin polarity functions
-  // NOTE:  
-  //        1 = Inverted (active-high open collector)
-  //        0 = Normal (active-low open collector) (default)
-  //
+  /** alert-pin-polarity: Alert pin polarity functions
+      - 1 = Inverted (active-high open collector)
+      - 0 = Normal (active-low open collector) (default) */
   alert-pin-polarity --set/int -> none:
     assert: 0 <= set <= 1
     oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
@@ -533,12 +529,11 @@ class Driver:
     reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
     logger_.debug "alert-pin-polarity: alert-pin $(set) is $(bits-16 oldMask) to $(bits-16 newMask)"
 
-  // Human readable alias for setting alert pin polarity
+  /** alert-pin-polarity - Human readable alias for setting alert pin polarity */
   alert-pin-polarity --inverted -> none:  alert-pin-polarity --set=1
   alert-pin-polarity --normal   -> none:  alert-pin-polarity --set=0
 
-  // Retrieve configured alert pin polarity setting
-  //
+  /** Retrieve configured alert pin polarity setting */
   alert-pin-polarity -> bool:
     // inverted = true, normal = false
     oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
@@ -548,15 +543,8 @@ class Driver:
     logger_.debug "alert-pin-polarity: is $(polarityInvertedBit) [$(polarityInverted)]"
     return polarityInverted
 
-  // Alerts
-  // NOTE:  Slightly different to the implementations I'd seen, I wanted alerts to
-  //        be visible as a value on the class object, and not stored separately 
-  //        from the source of truth.  So these functions attempt to source the current
-  //        status of each alert from the device itself.
-  
-  // return true if any of the three alerts exists
-  // NOTE:  done this way so that during debugging mode, the exact alert that triggered will be shown
-  //        (more reads) whereas without debug mode, one read would suffice.
+  /** alert: return true if any of the three alerts exists
+      Slightly different to other implementations. This method attempts to keep alerts visible as a value on the class object, so as not to be stored separately from the source of truth and therefore risk being stale.  So these functions attempt to source the current status of each alert from the device itself. */
   alert -> bool:
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     if (register & ALERT-MATH-OVERFLOW-FLAG_) != 0: logger_.debug "alert: ALERT-MATH-OVERFLOW-FLAG_"
@@ -565,17 +553,18 @@ class Driver:
     checkMask    := ALERT-MATH-OVERFLOW-FLAG_ | ALERT-FUNCTION-FLAG_ | ALERT-CONVERSION-READY-FLAG_
     return (register & checkMask) != 0
 
-  // clear alerts
+  /** alert --clear: clear alerts */
   alert --clear -> none:
-    // Not Tested - manual suggests reading the MASK-ENABLE is enough to clear any alerts
+    // Not Tested well - manual suggests reading the MASK-ENABLE is enough to clear any alerts.
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
 
-  overflow-alert   -> bool:
+  /** alert --overflow: returns true if an overflow alert exists */
+  alert --overflow  -> bool:
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    overflow := false
+    overflow = false
     overflowBit := ((register & ALERT-MATH-OVERFLOW-FLAG_) >> ALERT-MATH-OVERFLOW-OFFSET_ ) & ALERT-MATH-OVERFLOW-LENGTH_
     if overflowBit == 1: overflow = true
-    logger_.debug "overflow-alert: overflow bit is $(overflowBit) [$(overflow)]"
+    logger_.debug "alert --overflow: overflow bit is $(overflowBit) [$(overflow)]"
     return overflow
 
   limit-alert      -> bool:
@@ -586,16 +575,10 @@ class Driver:
     logger_.debug "limit-alert: configured limit bit is $(overflowBit) [$(overflow)]"
     return overflow
 
-  // Determine If Conversion is Complete
-  // Note:  Although the device can be read at any time, and the data from
-  //        the last conversion is available, the Conversion Ready Flag bit is
-  //        provided to help coordinate one-shot or triggered conversions. The 
-  //        Conversion Ready Flag bit is set after all conversions, averaging, 
-  //        and multiplications are complete. Conversion Ready Flag bit clears
-  //        under the following conditions:
-  //        1. Writing to the Configuration Register (except for Power-Down selection)
-  //        2. Reading the Mask/Enable Register
-  //
+  /** Determine If Conversion is Complete
+      Although the device can be read at any time, and the data from the last conversion is available, the Conversion Ready Flag bit is provided to help coordinate one-shot or triggered conversions. The Conversion Ready Flag bit is set after all conversions, averaging, and multiplications are complete. Conversion Ready Flag bit clears under the following conditions:
+      1. Writing to the Configuration Register (except for Power-Down selection)
+      2. Reading the Mask/Enable Register */
   conversion-ready-alert -> bool:
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     conversionReady := false
@@ -604,13 +587,11 @@ class Driver:
     logger_.debug "conversion-ready-alert: conversion ready bit is $(conversionReadyBit) [$(conversionReady)]"
     return conversionReady
 
-  // Alias for alert-conversion-ready
-  //
+  /** conversion-ready: alias returning true/false for $conversion-ready-alert */
   conversion-ready -> bool:
     return conversion-ready-alert
   
-  // Configure the alert function enabling the pin to be used to signal conversion ready.
-  //
+  /** conversion-ready --set/int: Configure the alert function enabling the pin to be used to signal conversion ready. */
   conversion-ready --set/int -> none:
     assert: 0 <= set <= 1
     oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
@@ -620,18 +601,15 @@ class Driver:
     reg_.write-u16-be REGISTER-MASK-ENABLE_ newMask
     logger_.debug "conversion-ready: alert-pin $(set) is $(bits-16 oldMask) to $(bits-16 newMask)"
 
-  // Helpful alias for setting 'conversion-ready' on alert pin
-  //
+  /** conversion-ready --enable-alert-pin: Helpful alias for setting 'conversion-ready' on alert pin */
   conversion-ready --enable-alert-pin -> none:
     conversion-ready --set=1
 
-  // Helpful alias for setting 'conversion-ready' on alert pin
-  //
+  /** conversion-ready --disable-alert-pin: Helpful alias for setting 'conversion-ready' on alert pin */
   conversion-ready --disable-alert-pin -> none:
     conversion-ready --set=0
 
-  // Returns microsecs for TIMING-x-US statics 0..7
-  // NOTE:  A helper function
+  /** conversion-time-us-from-enum: Returns microsecs for TIMING-x-US statics 0..7 */
   conversion-time-us-from-enum --code/int -> int:
     assert: 0 <= code <= 7
     if code == 0: return 140
@@ -644,8 +622,7 @@ class Driver:
     if code == 7: return 8300
     return 1100  // default/defensive - should never happen
 
-  // Returns sample count for AVERAGE-x-SAMPLE statics 0..7
-  // NOTE:  A helper function
+  /** sampling-rate-from-enum: Returns sample count for AVERAGE-x-SAMPLE statics 0..7 */
   sampling-rate-from-enum --code/int -> int:
     assert: 0 <= code <= 7
     if code == 0: return 1
@@ -658,10 +635,8 @@ class Driver:
     if code == 7: return 1024
     return 1  // default/defensive - should never happen
 
-  // Estimate a maximum waiting time based on the configuration
-  // NOTE:  Done this way to prevent setting a global maxWait type
-  //        value, to then have it fail based on times that are longer
-  //        due to timing configurations 
+  /** estimated-conversion-time: estimate a maximum waiting time based on the configuration
+      Done this way to prevent setting a global maxWait type value, to then have it fail based on times that are longer due to timing configurations  */
   estimated-conversion-time --ms -> int:
     // Read config and decode fields using masks/offsets
     register/int    := reg_.read-u16-be REGISTER-CONFIG_
@@ -691,26 +666,23 @@ class Driver:
 
   // INFORMATION FUNCTIONS
 
-  // Get Manufacturer/Die identifiers
-  // NOTE:  maybe useful if expanding driver to suit an additional sibling device
-  //
+  /** Get Manufacturer/Die identifiers
+      Maybe useful if expanding driver to suit an additional sibling device */
   manufacturer-id -> int:
     manid := reg_.read-u16-be REGISTER-MANUF-ID_
     logger_.debug "manufacturer-id: is 0x$(%04x manid) [$(manid)]"
     return manid
   
-  // Device ID Bits
-  // NOTE:  Bits 4-15 Stores the device identification bits
-  // 
+  /** device-identification: returns integer of device ID bits
+      REGISTER-DIE-ID_ register, bits 4-15 Stores the device identification bits */
   device-identification -> int:
     register := reg_.read-u16-be REGISTER-DIE-ID_
     dieidDid := (register & DIE-ID-DID-MASK_) >> 4
     logger_.debug "device-identification: is 0x$(%04x dieidDid) [$(dieidDid)]"
     return dieidDid
 
-  // Die Revision ID Bits
-  // NOTE:  Bit 0-3 Stores the device revision identification bits
-  //
+  /** device-revision: Die Revision ID Bits
+      REGISTER-DIE-ID_ register, bits 0-3 store the device revision number bits */
   device-revision -> int:
     register := reg_.read-u16-be REGISTER-DIE-ID_
     dieidRid := (register & DIE-ID-RID-MASK_)
@@ -719,16 +691,14 @@ class Driver:
 
   // TROUBLESHOOTING FUNCTIONS
 
-  // Infer Shunt Resistor using a known load resistor
-  // NOTE:  Averages a few samples for stability, ensures both voltages come from the
-  //        same conversion, and returns the estimated shunt value.
-  // NOTE:  On Accuracy:
-  //        - Known load tolerance dominates: use a 0.1–1% resistor if possible
-  //        - Make sure VBUS & load node (IN−) are tied
-  //        - Kelvin the shunt if possible: sense pins at the shunt pads
-  //        - Perform test/readings after the load settles - average some samples
-  //        - Low-current corner: if Vshunt is just a few tens of µV, quantization/noise
-  //          can move the estimate; use a load that draws a few mA+ to get a clean mV-level Vsh.
+  /** infer-shunt-resistor: Infer Shunt Resistor using a known load resistor
+      Averages a few samples for stability, ensures both voltages come from the same conversion, and returns the estimated shunt value.
+      On Accuracy:
+      - Known load tolerance dominates: use a 0.1–1% resistor if possible
+      - Make sure VBUS & load node (IN−) are tied
+      - Kelvin the shunt if possible: sense pins at the shunt pads
+      - Perform test/readings after the load settles - average some samples
+      - Low-current corner: if Vshunt is just a few tens of µV, quantization/noise can move the estimate; use a load that draws a few mA+ to get a clean mV-level Vsh. */
   infer-shunt-resistor --loadResistor/float -> float:
     assert: loadResistor > 0.0
 
@@ -756,9 +726,8 @@ class Driver:
     logger_.debug "infer-shunt-resistor: Vload=$(loadVoltage) V  Vsh=$(shuntVoltage) V  Rload=$(loadResistor) Ohm  -> I=$(currentEstimate)A  Rsh_est=$(shuntResistorEstimate) Ohm"
     return shuntResistorEstimate
 
-  // Determine shunt resistor value from known load
-  // NOTE:  See notes above for similar function.
-  //        Useful if you have a DMM clamp or source  
+  /** infer-shunt-resistor --loadCurrent: Determine shunt resistor value from known load
+      Useful if you have a DMM clamp or source.  See notes above for similar function. */
   infer-shunt-resistor --loadCurrent/float -> float:
     assert: loadCurrent > 0.0
 
@@ -778,12 +747,8 @@ class Driver:
     return shuntResistorEstimate
 
 
-  // Determine VBUS and VLOAD are different
-  // NOTE:  Evaluates if the bus and load voltages are different (eg not tied).
-  //        Useful for diagnostic functions only.  If the voltages are the same,
-  //        it is not proof that they are tied, this attempts to check for the
-  //        simple case where values indiate it is not tied.
-  //
+  /** verify-tied-bus-load: Determine VBUS and VLOAD are different
+      Evaluates if the bus and load voltages are different (eg not tied). Useful for diagnostic functions only.  If the voltages are the same, it is not proof that they are tied, this attempts to check for the simple case where values indiate it is not tied. */
   verify-tied-bus-load -> bool:
     // Optional: ensure fresh data
     single-measurement
@@ -804,11 +769,8 @@ class Driver:
       logger_.debug "verify-tied-bus-load: Bus and load differ significantly (not tied)    Delta=$(%0.8f busLoadDelta)V"
       return false
 
-  // Print Diagnostic Information
-  // NOTE:  Prints relevant measurement information to allow someone with a
-  //        Voltmeter to double check what is measured and compare it.  Also
-  //        calculates/compares using Ohms Law (V=I*R)
-  //
+  /** Print Diagnostic Information
+      Prints relevant measurement information to allow someone with a Voltmeter to double check what is measured and compare it.  Also calculates/compares using Ohms Law (V=I*R) */
   print-diagnostics -> none:
     // Optional: ensure fresh data
     single-measurement
@@ -869,8 +831,7 @@ class Driver:
     else:
       print "    Check Shunt Voltage : BAD!! ($(%0.3f shuntVoltageDifferencePct)% > 20%): shunt voltage mismatch"
 
-  // Helper Function for displaying bitmasks nicely
-  //
+  /** Helper Function for displaying bitmasks nicely */
   bits-16 x/int -> string:
     outStr := "$(%b x)"
     outStr = outStr.pad --left 16 '0'
