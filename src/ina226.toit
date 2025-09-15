@@ -261,7 +261,7 @@ class Driver:
     reg_.write-u16-be REGISTER-CONFIG_ new-value
     sleep --ms=(estimated-conversion-time --ms)
     after-value := reg_.read-u16-be REGISTER-CONFIG_
-    log.info "reset: 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
+    logger_.info "reset_: 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
 
   /** Get Calibration Value */
   calibration-value -> int:
@@ -271,7 +271,6 @@ class Driver:
 
   // Set Calibration Value - outright
   calibration-value --value/int -> none:
-    logger_.debug "Calibration-value $(value) requested"
     //assert: ((value >= 1500) and (value <= 3000))  // sanity check
     old-value := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
@@ -359,7 +358,7 @@ class Driver:
     calibration-value --value=(calibrationValue).round
     current-divider-ma_    = 0.001 / current-LSB_
     power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
-    logger_.debug "resistor-range: (32767 * current-LSB_ is $(32767 * current-LSB_) compared to $(max-current_)"
+    logger_.debug "resistor-range: (32767 * current-LSB_)=$(32767 * current-LSB_) compared to $(max-current_)"
     // Check manually if necessary: assert: (32767 * current-LSB_ >= max-current_)
 
   resistor-range --resistor/float -> none:
