@@ -7,7 +7,7 @@ import binary
 import serial.device as serial
 import serial.registers as registers
 
-// DEFAULT-I2C-ADDRESS is 64 with jumper defaults.
+// $DEFAULT-I2C-ADDRESS is 64 (0x40) with jumper defaults.
 // Valid address values: 64 to 79 - See datasheet table 6-2
 DEFAULT-I2C-ADDRESS                      ::= 0x40
 
@@ -138,12 +138,8 @@ main:
     ina226driver.power-off
     sleep --ms=60000 // Wait 1 Minute
 ```
-
 */
 
-/*
-$DEFAULT-I2C-ADDRESS ($ hotlinks to code location!)  Used for parameters
-*/
 
 class Driver:
   // Core Register Addresses
@@ -214,7 +210,10 @@ class Driver:
 
   // CONFIGURATION FUNCTIONS
 
-  // Initial Device Configuration
+  /** Initial Device Configuration - Starts:
+      - Assuming the default shunt resistor is installed R100 (0.1 Ohm).
+      - Starts in Continuous Mode.
+      */
   initialise-device_ -> none:
     // Maybe not reuiqred but the manual suggests you should do it
     reset_
@@ -253,8 +252,8 @@ class Driver:
     // NOTE:  Using this helper function, the actual values used in the calculations are visible
     // print-diagnostics
 
-  // Reset Device
-  // NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears
+  /** Reset Device
+      NOTE:  Setting bit 16 resets the device, afterwards the bit self-clears. */
   reset_ -> none:
     old-value := reg_.read-u16-be REGISTER-CONFIG_
     new-value := old-value | CONF-RESET-MASK_
@@ -265,11 +264,9 @@ class Driver:
 
   /** Get Calibration Value */
   calibration-value -> int:
-    register := reg_.read-u16-be REGISTER-CALIBRATION_
-    logger_.debug "calibration-value: retrieved $(register)"
-    return register
+    return reg_.read-u16-be REGISTER-CALIBRATION_
 
-  // Set Calibration Value - outright
+  /** Set Calibration Value - outright */
   calibration-value --value/int -> none:
     //assert: ((value >= 1500) and (value <= 3000))  // sanity check
     old-value := reg_.read-u16-be REGISTER-CALIBRATION_
@@ -292,26 +289,25 @@ class Driver:
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     logger_.debug "sampling-rate: set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
-  /** Retrieve current sampling rate code/enum value */
+  /** Retrieve current sampling rate
+      This is the register code/enum value, not a rate of its own, needs conversion with $sampling-rate --count={enum} */
   sampling-rate --code -> int:
-    mask := reg_.read-u16-be REGISTER-CONFIG_
-    return ((mask & CONF-AVERAGE-MASK_) >> 9)
+    return ((reg_.read-u16-be REGISTER-CONFIG_ & CONF-AVERAGE-MASK_) >> 9)
 
-  // Return human readable sampling count number
-  // 
+  /** Return human readable sampling count number */
   sampling-rate --count -> int:
     return sampling-rate-from-enum --code=(sampling-rate --code)
 
-  // Set Conversion Time
-  // NOTE:  The conversion time setting tells the ADC how long to spend on a single 
-  //        measurement of either the shunt voltage or the bus voltage.
-  //        - Longer time = more samples averaged inside = less noise, higher resolution.
-  //        - Shorter time = fewer samples = faster updates, but noisier.
-  // NOTE:  Both Bus and Shunt have separate conversion times
-  //        - Bus voltage = the “supply” or “load node” you’re monitoring.
-  //        - Shunt voltage = the tiny drop across your shunt resistor.
-  //        - Current isn’t measured directly — it’s computed later from Vshunt/Rshunt
-  //
+  /** Set Conversion Time
+      NOTE:  The conversion time setting tells the ADC how long to spend on a single measurement of either the shunt voltage or the bus voltage.
+      - Longer time = more samples averaged inside = less noise, higher resolution.
+      - Shorter time = fewer samples = faster updates, but noisier.
+      NOTE:  Both Bus and Shunt have separate conversion times
+      - Bus voltage = the “supply” or “load node” you’re monitoring.
+      - Shunt voltage = the tiny drop across your shunt resistor.
+      - Current isn’t measured directly — it’s computed later from Vshunt/Rshunt */
+
+  /** conversion-time: (Overload) Sets conversion-time for bus only */  
   conversion-time --bus/int -> none:
     oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
@@ -319,7 +315,8 @@ class Driver:
     newMask     |= (bus << CONF-BUSVC-OFFSET_)
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     logger_.debug "conversion-time: --bus set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
-  
+
+  /** conversion-time: (Overload) Sets conversion-time for shunt only */  
   conversion-time --shunt/int -> none:
     oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
@@ -328,14 +325,13 @@ class Driver:
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     logger_.debug "conversion-time: --shunt set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
 
-  // Sets both to the same when one value is given
+  /** conversion-time: (Overload) Sets conversion-time for both to the same when only one value is given */
   conversion-time --time/int -> none:
     conversion-time --shunt=time
     conversion-time --bus=time
 
-  // Sets Measure Mode
-  // NOTE:  Keeps track of last measure mode set, in a global. Ensures device comes back on
-  //        into the same mode using 'PowerOn'
+  /** measure-mode: Sets Measure Mode
+      Keeps track of last measure mode set, in a global. Ensures device comes back on into the same mode using 'PowerOn' */
   measure-mode --mode/int -> none:
     oldMask/int := reg_.read-u16-be REGISTER-CONFIG_
     newMask/int := oldMask
@@ -345,9 +341,8 @@ class Driver:
     logger_.debug "measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
     if (mode != MODE-POWER-DOWN): last-measure-mode_ = mode
 
-  // Set resistor and current range, independently 
-  // NOTE:  Resistor value in ohm, Current range in A
-  // 
+  /** resistor-range: Set resistor and current range, independently 
+      Resistor value in ohm, Current range in A */
   resistor-range --resistor/float --max-current/float -> none:
     shunt-resistor_        = resistor                                              // Cache to class-wide for later use
     max-current_           = max-current                                           // Cache to class-wide for later use
@@ -380,33 +375,31 @@ class Driver:
 
   shunt-voltage --millivolts -> float:  return (shunt-voltage --volts) * 1000.0
   
-  // Upstream voltage, before the shunt (IN+).
-  // NOTE:  That is the rail straight from the power source, minus any drop across
-  //        the shunt. Since INA226 doesn’t have a dedicated pin for this, it can
-  //        be reconstructed by: Vsupply = Vbus + Vshunt.   i.e. add the measured 
-  //        bus voltage (load side) and the measured shunt voltage.
+  /** supply-voltage: Upstream voltage, before the shunt (IN+).
+      This is the rail straight from the power source, minus any drop across the shunt. Since INA226 doesn’t have a dedicated pin for this, it can be reconstructed by: Vsupply = Vbus + Vshunt.   i.e. add the measured bus voltage (load side) and the measured shunt voltage. */
   supply-voltage --volts -> float:
     return ((bus-voltage --volts) + (shunt-voltage --volts))
 
   supply-voltage --millivolts -> float:
     return (supply-voltage --volts) * 1000.0
 
+  /** bus-voltage: whatever is wired to the VBUS pin.  
+      On most breakout boards, VBUS is tied internally to IN− (the low side of the shunt). So in practice, “bus voltage” usually means the voltage at the load side of the shunt.  This is what the load actually sees as its supply rail. */
   bus-voltage --volts -> float:
-    // whatever is wired to the VBUS pin.  On most breakout boards, VBUS is tied 
-    // internally to IN− (the low side of the shunt). So in practice, “bus voltage” 
-    // usually means the voltage at the load side of the shunt.  This is what the 
-    // load actually sees as its supply rail.
     register := reg_.read-i16-be REGISTER-BUS-VOLTAGE_
     return (register * 0.00125)
-
+  
+  /** bus-voltage: same as $bus-voltage --volts but in millivolts */
   bus-voltage  --millivolts -> float:
     return (bus-voltage --volts) * 1000.0
   
+  /** load-power: Watts used by the load
+      Calculated using the cached multiplier [pwrMultiplier_mW_ = 1000 * 25 * current-LSB_] */
   load-power --milliwatts -> float:
-    // Using the cached multiplier [pwrMultiplier_mW_ = 1000 * 25 * current-LSB_]
     register := reg_.read-u16-be REGISTER-LOAD-POWER_
     return (register * power-multiplier-mw_).to-float
 
+  /** bus-voltage: same as $load-power --watts but in milliwatts */
   load-power --watts -> float:
     return (load-power --milliwatts) / 1000.0
 
@@ -416,55 +409,48 @@ class Driver:
   load-current --amps -> float:        return (shunt-current --amps)
   load-current --milliamps -> float:   return (shunt-current --milliamps)
 
-  // Simple aliases for enabling and disabling device 
-  // NOTE:  The powering on relies on the cached global variable which
-  //        records what it was last set to.
+  /** power-down: simple aliase for enabling device if disabled */
   power-down -> none:
     measure-mode --mode=MODE-POWER-DOWN
+
+  /** power-up: simple aliase for enabling the device if disabled */
   power-up -> none:
     measure-mode --mode=last-measure-mode_
     sleep --ms=(estimated-conversion-time --ms)
 
-  // Returns true if conversion is still ongoing
+  /** busy: Returns true if conversion is still ongoing */
   busy -> bool:
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_            // clears CNVR (Conversion Ready) Flag
     val/bool     :=  ((register & ALERT-CONVERSION-READY-FLAG_) == 0)
     return val
 
+  /** wait-until-conversion-completed: waits until conversion is completed */
   wait-until-conversion-completed -> none:
     maxWaitTimeMs/int   := estimated-conversion-time --ms
     curWaitTimeMs/int   := 0
     sleepIntervalMs/int := 50
-    while busy:                                                               // checks if sampling is completed
+    while busy:                                                        // checks if sampling is completed
         sleep --ms=sleepIntervalMs
         curWaitTimeMs += sleepIntervalMs
         if curWaitTimeMs >= maxWaitTimeMs:
           logger_.debug "waitUntilConversionCompleted: maxWaitTime $(maxWaitTimeMs)ms exceeded - breaking"
           break
-    //logger_.debug " waitUntilConversionCompleted: waited $(curWaitTimeMs)ms of max $(maxWaitTimeMs)ms"
 
-  // Single Measurement - wait for completion
-  //
+  /** single-measurement: initiate a single measurement without waiting for completion */
   single-measurement -> none:
     single-measurement --nowait
     wait-until-conversion-completed
   
-  // Perform a single conversion - without waiting
-  //
+  /** single-measurement: perform a single conversion - without waiting */
   single-measurement --nowait -> none:
     maskRegister/int   := reg_.read-u16-be REGISTER-MASK-ENABLE_      // clears CNVR (Conversion Ready) Flag
     confRegister/int   := reg_.read-u16-be REGISTER-CONFIG_     
     reg_.write-u16-be REGISTER-CONFIG_ confRegister                   // Starts conversion
 
-  // ALERT FUNCTIONS 
+  /** ALERT FUNCTIONS  */
 
-  // Configuring the various alert types
-  // NOTE:  Requires a value from the alert type enum.  If multiple functions are enabled
-  //        the highest significant bit position Alert Function (D15-D11) takes priority 
-  //        and responds to the Alert Limit Register.  ie. only one alert of one type
-  //        can be configured simultaneously.  Whatever is in the alert value (register) 
-  //        at that time, is then the alert trigger value.
-  //
+  /** set-alert: configures the various alert types
+      Requires a value from the alert type enum.  If multiple functions are enabled the highest significant bit position Alert Function (D15-D11) takes priority and responds to the Alert Limit Register.  ie. only one alert of one type can be configured simultaneously.  Whatever is in the alert value (register) at that time, is then the alert trigger value. */
   set-alert --type/int --limit/float -> none:
     alertLimit/float := 0.0
 
@@ -500,15 +486,10 @@ class Driver:
     reg_.write-u16-be REGISTER-ALERT-LIMIT_ (alertLimit).to-int
     logger_.debug "set-alert: alert limit set to $(alertLimit)"
 
-  // Alert "Latching"
-  // NOTE:  When the Alert Latch Enable bit is set to Transparent mode, the Alert 
-  //        pin and Flag bit resets to the idle states when the fault has been cleared.
-  //        When the Alert Latch Enable bit is set to Latch mode, the Alert pin and
-  //        Alert Flag bit remains active following a fault until the Mask/Enable 
-  //        Register has been read.
-  //        1 = Latch enabled
-  //        0 = Transparent (default)
-  //
+  /** alert-latch: "Latching"
+      When the Alert Latch Enable bit is set to Transparent mode, the Alert pin and Flag bit resets to the idle states when the fault has been cleared.  When the Alert Latch Enable bit is set to Latch mode, the Alert pin and Alert Flag bit remains active following a fault until the Mask/Enable Register has been read.
+      - 1 = Latch enabled
+      - 0 = Transparent (default) */
   alert-latch --set/int -> none:
     assert: 0 <= set <= 1
     oldMask/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
