@@ -1,6 +1,8 @@
-// Copyright (C) 2025 Milkmansson
+
+// Copyright (C) 2025 Toit Contributors
 // Use of this source code is governed by an MIT-style license that can be
-// found in the package's LICENSE file.
+// found in the package's LICENSE file.   This also file includes derivative 
+// work from other authors and sources.  See accompanying documentation.
 
 import log
 import binary
@@ -11,42 +13,37 @@ import serial.registers as registers
 // Valid address values: 64 to 79 - See datasheet table 6-2
 DEFAULT-I2C-ADDRESS                      ::= 0x40
 
-// Constants to be used by users during configuration
+// Helpful constants to be used by users during configuration
 
 // Alert Types that can set off the alert register and/or alert pin.
-ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
-ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
-ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
-ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
-ALERT-POWER-OVER                         ::= 0x0800
-ALERT-CURRENT-OVER                       ::= 0xFFFE
-ALERT-CURRENT-UNDER                      ::= 0xFFFF
-ALERT-CONVERSION-READY                   ::= 0x0400
+INA-226-ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
+INA-226-ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
+INA-226-ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
+INA-226-ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
+INA-226-ALERT-POWER-OVER                         ::= 0x0800
+INA-226-ALERT-CURRENT-OVER                       ::= 0xFFFE
+INA-226-ALERT-CURRENT-UNDER                      ::= 0xFFFF
+INA-226-ALERT-CONVERSION-READY                   ::= 0x0400
 
 // AVERAGE SAMPLE SIZE ENUM 
-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
-AVERAGE-4-SAMPLES                        ::= 0x0001
-AVERAGE-16-SAMPLES                       ::= 0x0002
-AVERAGE-64-SAMPLES                       ::= 0x0003
-AVERAGE-128-SAMPLES                      ::= 0x0004
-AVERAGE-256-SAMPLES                      ::= 0x0005
-AVERAGE-512-SAMPLES                      ::= 0x0006
-AVERAGE-1024-SAMPLES                     ::= 0x0007
+INA-226-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
+INA-226-AVERAGE-4-SAMPLES                        ::= 0x0001
+INA-226-AVERAGE-16-SAMPLES                       ::= 0x0002
+INA-226-AVERAGE-64-SAMPLES                       ::= 0x0003
+INA-226-AVERAGE-128-SAMPLES                      ::= 0x0004
+INA-226-AVERAGE-256-SAMPLES                      ::= 0x0005
+INA-226-AVERAGE-512-SAMPLES                      ::= 0x0006
+INA-226-AVERAGE-1024-SAMPLES                     ::= 0x0007
 
 // BVCT and SVCT conversion timing ENUM
-TIMING-140-US                            ::= 0x0000
-TIMING-204-US                            ::= 0x0001
-TIMING-332-US                            ::= 0x0002
-TIMING-588-US                            ::= 0x0003
-TIMING-1100-US                           ::= 0x0004 // Default
-TIMING-2100-US                           ::= 0x0005
-TIMING-4200-US                           ::= 0x0006
-TIMING-8300-US                           ::= 0x0007
-
-// 'Measure Mode' (includes OFF)
-MODE-POWER-DOWN                          ::= 0x0000
-MODE-TRIGGERED                           ::= 0x0003
-MODE-CONTINUOUS                          ::= 0x0007
+INA-226-TIMING-140-US                            ::= 0x0000
+INA-226-TIMING-204-US                            ::= 0x0001
+INA-226-TIMING-332-US                            ::= 0x0002
+INA-226-TIMING-588-US                            ::= 0x0003
+INA-226-TIMING-1100-US                           ::= 0x0004 // Default
+INA-226-TIMING-2100-US                           ::= 0x0005
+INA-226-TIMING-4200-US                           ::= 0x0006
+INA-226-TIMING-8300-US                           ::= 0x0007
 
 /**
 Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/.  There are others with different feature sets and may be partially code compatible.
@@ -190,10 +187,17 @@ class Driver:
   static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
   static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 81.92  // millivolts
 
+  // 'Measure Mode' (includes OFF)
+  static MODE-POWER-DOWN_                         ::= 0x00
+  static MODE-TRIGGERED_                          ::= 0x03
+  static MODE-CONTINUOUS_                         ::= 0x07
+
+  static INA226-DEVICE-ID                         ::= 0x0226
+
   reg_/registers.Registers                        := ?  
   current-divider-ma_/float                       := 0.0
   power-multiplier-mw_/float                      := 0.0
-  last-measure-mode_/int                          := MODE-CONTINUOUS
+  last-measure-mode_/int                          := MODE-CONTINUOUS_
   current-LSB_/float                              := 0.0
   shunt-resistor_/float                           := 0.0
   current-range_/float                            := 0.0
@@ -204,6 +208,12 @@ class Driver:
   constructor dev/serial.Device --logger/log.Logger=(log.default.with-name "ina226"):
     logger_ = logger
     reg_ = dev.registers
+
+    if (device-identification != INA226-DEVICE-ID): 
+      logger_.info "Device is NOT an INA226 (0x$(%04x INA226-DEVICE-ID) [Device ID:0x$(%04x device-identification)]) "
+      logger_.info "Device is man-id=0x$(%04x manufacturer-id) dev-id=0x$(%04x device-identification) rev=0x$(%04x device-revision)"
+      throw "Device is not an INA226."
+
     initialise-device_
 
   // CONFIGURATION FUNCTIONS
@@ -230,9 +240,9 @@ class Driver:
     // calibration-value --value=DEFAULT-CALIBRATION-VALUE
 
     // Initialise Default sampling, conversion timing, and measuring mode
-    sampling-rate --rate=AVERAGE-1-SAMPLE
-    conversion-time --time=TIMING-1100-US
-    measure-mode --mode=MODE-CONTINUOUS
+    sampling-rate --rate=INA-226-AVERAGE-1-SAMPLE
+    conversion-time --time=INA-226-TIMING-1100-US
+    measure-mode --mode=MODE-CONTINUOUS_
 
     // Set Defaults for Resistor Range
     // NOTE:  There appears to have been originally two constants/values for 'current range'
@@ -335,7 +345,7 @@ class Driver:
     newMask     |= mode  //low value, no left shift offset
     reg_.write-u16-be REGISTER-CONFIG_ newMask
     logger_.debug "measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
-    if (mode != MODE-POWER-DOWN): last-measure-mode_ = mode
+    if (mode != MODE-POWER-DOWN_): last-measure-mode_ = mode
 
   /** resistor-range --resistor --max-current: Set resistor and current range, independently 
       Resistor value in ohm, Current range in A */
@@ -413,7 +423,7 @@ class Driver:
 
   /** power-down: simple aliase for enabling device if disabled */
   power-down -> none:
-    measure-mode --mode=MODE-POWER-DOWN
+    measure-mode --mode=MODE-POWER-DOWN_
 
   /** power-up: simple aliase for enabling the device if disabled */
   power-up -> none:
@@ -456,21 +466,21 @@ class Driver:
   set-alert --type/int --limit/float -> none:
     alertLimit/float := 0.0
 
-    if type == ALERT-SHUNT-OVER-VOLTAGE:
+    if type == INA-226-ALERT-SHUNT-OVER-VOLTAGE:
       alertLimit = limit * 400          
-    else if type == ALERT-SHUNT-UNDER-VOLTAGE:
+    else if type == INA-226-ALERT-SHUNT-UNDER-VOLTAGE:
       alertLimit = limit * 400
-    else if type == ALERT-CURRENT-OVER:
-      type = ALERT-SHUNT-OVER-VOLTAGE
+    else if type == INA-226-ALERT-CURRENT-OVER:
+      type = INA-226-ALERT-SHUNT-OVER-VOLTAGE
       alertLimit = limit * 2048 * current-divider-ma_ / (calibration-value).to-float
-    else if type == ALERT-CURRENT-UNDER:
-      type = ALERT-SHUNT-UNDER-VOLTAGE
+    else if type == INA-226-ALERT-CURRENT-UNDER:
+      type = INA-226-ALERT-SHUNT-UNDER-VOLTAGE
       alertLimit = limit * 2048 * current-divider-ma_ / (calibration-value).to-float
-    else if type == ALERT-BUS-OVER-VOLTAGE:
+    else if type == INA-226-ALERT-BUS-OVER-VOLTAGE:
       alertLimit = limit * 800
-    else if type == ALERT-BUS-UNDER-VOLTAGE:
+    else if type == INA-226-ALERT-BUS-UNDER-VOLTAGE:
       alertLimit = limit * 800
-    else if type == ALERT-POWER-OVER:
+    else if type == INA-226-ALERT-POWER-OVER:
       alertLimit = limit / power-multiplier-mw_
     else:
       logger_.debug "set-alert: unexpected alert type"
@@ -670,7 +680,7 @@ class Driver:
       Maybe useful if expanding driver to suit an additional sibling device */
   manufacturer-id -> int:
     manid := reg_.read-u16-be REGISTER-MANUF-ID_
-    logger_.debug "manufacturer-id: is 0x$(%04x manid) [$(manid)]"
+    //logger_.debug "manufacturer-id: is 0x$(%04x manid) [$(manid)]"
     return manid
   
   /** device-identification: returns integer of device ID bits
@@ -678,7 +688,7 @@ class Driver:
   device-identification -> int:
     register := reg_.read-u16-be REGISTER-DIE-ID_
     dieidDid := (register & DIE-ID-DID-MASK_) >> 4
-    logger_.debug "device-identification: is 0x$(%04x dieidDid) [$(dieidDid)]"
+    //logger_.debug "device-identification: is 0x$(%04x dieidDid) [$(dieidDid)]"
     return dieidDid
 
   /** device-revision: Die Revision ID Bits
@@ -686,7 +696,7 @@ class Driver:
   device-revision -> int:
     register := reg_.read-u16-be REGISTER-DIE-ID_
     dieidRid := (register & DIE-ID-RID-MASK_)
-    logger_.debug "device-revision: is 0x$(%04x dieidRid) [$(dieidRid)]"
+    //logger_.debug "device-revision: is 0x$(%04x dieidRid) [$(dieidRid)]"
     return dieidRid
 
   // TROUBLESHOOTING FUNCTIONS
@@ -831,9 +841,15 @@ class Driver:
     else:
       print "    Check Shunt Voltage : BAD!! ($(%0.3f shuntVoltageDifferencePct)% > 20%): shunt voltage mismatch"
 
-  /** Helper Function for displaying bitmasks nicely */
-  bits-16 x/int -> string:
-    outStr := "$(%b x)"
-    outStr = outStr.pad --left 16 '0'
-    outStr = "$(outStr[0..4]).$(outStr[4..8]).$(outStr[8..12]).$(outStr[12..16])"
-    return outStr
+  /** Displays bitmasks nicely */
+  bits-16 x/int --display-bits/int=8 -> string:
+    if (x > 255) or (display-bits > 8):
+      outStr := "$(%b x)"
+      outStr = outStr.pad --left 16 '0'
+      outStr = "$(outStr[0..4]).$(outStr[4..8]).$(outStr[8..12]).$(outStr[12..16])"
+      return outStr
+    else:
+      outStr := "$(%b x)"
+      outStr = outStr.pad --left 8 '0'
+      outStr = "$(outStr[0..4]).$(outStr[4..8])"
+      return outStr
