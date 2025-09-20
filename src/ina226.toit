@@ -14,129 +14,50 @@ import serial.registers as registers
 DEFAULT-I2C-ADDRESS                      ::= 0x40
 
 // Helpful constants to be used by users during configuration
+INA226-MODE-POWER-DOWN                          ::= 0x00
+INA226-MODE-TRIGGERED                           ::= 0x03
+INA226-MODE-CONTINUOUS                          ::= 0x07
 
 // Alert Types that can set off the alert register and/or alert pin.
-INA-226-ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
-INA-226-ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
-INA-226-ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
-INA-226-ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
-INA-226-ALERT-POWER-OVER                         ::= 0x0800
-INA-226-ALERT-CURRENT-OVER                       ::= 0xFFFE
-INA-226-ALERT-CURRENT-UNDER                      ::= 0xFFFF
-INA-226-ALERT-CONVERSION-READY                   ::= 0x0400
+INA226-ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
+INA226-ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
+INA226-ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
+INA226-ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
+INA226-ALERT-POWER-OVER                         ::= 0x0800
+INA226-ALERT-CURRENT-OVER                       ::= 0xFFFE
+INA226-ALERT-CURRENT-UNDER                      ::= 0xFFFF
+INA226-ALERT-CONVERSION-READY                   ::= 0x0400
 
 // AVERAGE SAMPLE SIZE ENUM 
-INA-226-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
-INA-226-AVERAGE-4-SAMPLES                        ::= 0x0001
-INA-226-AVERAGE-16-SAMPLES                       ::= 0x0002
-INA-226-AVERAGE-64-SAMPLES                       ::= 0x0003
-INA-226-AVERAGE-128-SAMPLES                      ::= 0x0004
-INA-226-AVERAGE-256-SAMPLES                      ::= 0x0005
-INA-226-AVERAGE-512-SAMPLES                      ::= 0x0006
-INA-226-AVERAGE-1024-SAMPLES                     ::= 0x0007
+INA226-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
+INA226-AVERAGE-4-SAMPLES                        ::= 0x0001
+INA226-AVERAGE-16-SAMPLES                       ::= 0x0002
+INA226-AVERAGE-64-SAMPLES                       ::= 0x0003
+INA226-AVERAGE-128-SAMPLES                      ::= 0x0004
+INA226-AVERAGE-256-SAMPLES                      ::= 0x0005
+INA226-AVERAGE-512-SAMPLES                      ::= 0x0006
+INA226-AVERAGE-1024-SAMPLES                     ::= 0x0007
 
 // BVCT and SVCT conversion timing ENUM
-INA-226-TIMING-140-US                            ::= 0x0000
-INA-226-TIMING-204-US                            ::= 0x0001
-INA-226-TIMING-332-US                            ::= 0x0002
-INA-226-TIMING-588-US                            ::= 0x0003
-INA-226-TIMING-1100-US                           ::= 0x0004 // Default
-INA-226-TIMING-2100-US                           ::= 0x0005
-INA-226-TIMING-4200-US                           ::= 0x0006
-INA-226-TIMING-8300-US                           ::= 0x0007
+INA226-TIMING-140-US                            ::= 0x0000
+INA226-TIMING-204-US                            ::= 0x0001
+INA226-TIMING-332-US                            ::= 0x0002
+INA226-TIMING-588-US                            ::= 0x0003
+INA226-TIMING-1100-US                           ::= 0x0004 // Default
+INA226-TIMING-2100-US                           ::= 0x0005
+INA226-TIMING-4200-US                           ::= 0x0006
+INA226-TIMING-8300-US                           ::= 0x0007
 
 /**
 Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/.  There are others with different feature sets and may be partially code compatible.
 
-# Use Case 1: Simple Continuous Measurement 
-Simplest use case assumes an unmodified module with default wiring guidelines followed.  (Please see the Readme for pointers & guidance.) Assumes:
- - Module shunt resistor value R100 (0.1 Ohm)
- - Sample size of 1 (eg, no averaging)
- - Conversion time of 1100us
- - Continuous Mode
-```
-import gpio
-import i2c
-import ina226
-
-main:
-  frequency := 400_000
-  sda := gpio.Pin 26
-  scl := gpio.Pin 25
-  bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
-
-  ina226device := bus.device ina226.DEFAULT_I2C_ADDRESS
-  ina226driver := ina226.Driver ina226device
-  
-  # Continuously read and display values
-  while true:
-    print "$(%0.3f (ina226driver.load-current --amps))a"
-    print "$(%0.2f (ina226driver.supply-voltage --volts))v"
-    print "$(%0.4f (ina226driver.load-power --watts))w"
-    sleep --ms=500
-```
-# Use Case 2: Measuring Very Small Currents
-In this case the task is to measure tiny standby or sleep currents in the milliamp range.  The default shunt resistor is replaced with a larger value resistor (e.g. 1.0 Ω).  This increases the voltage drop per milliamp, giving the INA226 finer resolution for small loads. [The trade-off is that the maximum measurable current shrinks to about 80 mA (since the INA226 input saturates at ~81.92 mV), and more power is dissipated in the shunt as heat.]
-```
-import gpio
-import i2c
-import ina226
-
-main:
-  frequency := 400_000
-  sda := gpio.Pin 26
-  scl := gpio.Pin 25
-  bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
-
-  ina226device := bus.device ina226.DEFAULT_I2C_ADDRESS
-  ina226driver := ina226.Driver ina226device
-
-  # Reconfigure to the new 1.0 Ohm resistor
-  resistor-range --resistor=1.0
-  
-  # Continuously read and display values
-  while true:
-    print "$(%0.3f (ina226driver.load-current --amps))a"
-    print "$(%0.2f (ina226driver.supply-voltage --volts))v"
-    print "$(%0.4f (ina226driver.load-power --watts))w"
-    sleep --ms=500
-
-```
-# Use Case 3: Balancing Update Speed vs. Accuracy in a Battery-Powered Scenario
-Where the module must be wired into a solution running on a battery. The INA226 is used to monitor the node’s power draw to be able to estimate battery life.  The driver runs in continuous conversion mode by default, sampling all the time at relatively short conversion times.  This has a higher power requirement as the INA226 is constantly awake and operating.  
-In this case the driver needs to use triggered (single-shot) mode with longer conversion times and averaging enabled. 
-```
-import gpio
-import i2c
-import ina226
-
-main:
-  frequency := 400_000
-  sda := gpio.Pin 26
-  scl := gpio.Pin 25
-  bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
-
-  ina226device := bus.device ina226.DEFAULT_I2C_ADDRESS
-  ina226driver := ina226.Driver ina226device
-
-  ina226driver.sampling-rate --rate=AVERAGE-256-SAMPLES
-  ina226driver.conversion-time --time=TIMING-204-US
-  ina226driver.measure-mode --mode=MODE-TRIGGERED
-
-  
-  # Read and display values every minute, but turn the device off in between
-  while true:
-    ina226driver.power-up
-    single-measurement
-    print "$(%0.3f (ina226driver.load-current --amps))a"
-    print "$(%0.2f (ina226driver.supply-voltage --volts))v"
-    print "$(%0.4f (ina226driver.load-power --watts))w"
-    ina226driver.power-off
-    sleep --ms=60000 // Wait 1 Minute
-```
+Examples in the `examples` folder:
+- Use Case 1: Simple Continuous Measurement 
+- Use Case 2: Adjusting the Shunt Resistor to measure (for example, smaller) currents
+- Use Case 3: Balancing Update Speed vs. Accuracy in a Battery-Powered Scenario
 */
 
-class Driver:
+class Ina226:
   // Core Register Addresses
   static REGISTER-CONFIG_                ::= 0x00  //RW  // All-register reset, shunt voltage and bus voltage ADC conversion times and averaging, operating mode.
   static REGISTER-SHUNT-VOLTAGE_         ::= 0x01  //R   // Shunt voltage measurement data
@@ -185,7 +106,7 @@ class Driver:
   static CONVERSION-READY-LENGTH_                 ::= 1
 
   static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
-  static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 81.92  // millivolts
+  static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 0.08192  // volts
 
   // 'Measure Mode' (includes OFF)
   static MODE-POWER-DOWN_                         ::= 0x00
@@ -197,7 +118,7 @@ class Driver:
   reg_/registers.Registers                        := ?  
   current-divider-ma_/float                       := 0.0
   power-multiplier-mw_/float                      := 0.0
-  last-measure-mode_/int                          := MODE-CONTINUOUS_
+  last-measure-mode_/int                          := INA226-MODE-CONTINUOUS
   current-LSB_/float                              := 0.0
   shunt-resistor_/float                           := 0.0
   current-range_/float                            := 0.0
@@ -236,19 +157,19 @@ class Driver:
     //        because the Calibration register defaults to '0', yielding zero current
     //        and power values until the Calibration register is programmed.
     //        write initial calibration value, initial average value and conversion 
-    //        time.  This is not done here to ensure resistor-range does this.
+    //        time.  This is not done here to ensure shunt-resistor does this.
     // calibration-value --value=DEFAULT-CALIBRATION-VALUE
 
     // Initialise Default sampling, conversion timing, and measuring mode
-    sampling-rate --rate=INA-226-AVERAGE-1-SAMPLE
-    conversion-time --time=INA-226-TIMING-1100-US
+    sampling-rate --rate=INA226-AVERAGE-1-SAMPLE
+    conversion-time --time=INA226-TIMING-1100-US
     measure-mode --mode=MODE-CONTINUOUS_
 
     // Set Defaults for Resistor Range
     // NOTE:  There appears to have been originally two constants/values for 'current range'
     //        MA_400 and MA_800 - I tested these and found that my voltmeter agreed when
     //        current range is set to 0.800a - eg 800ma.
-    resistor-range --resistor=0.100 // --current-range=0.8
+    shunt-resistor --resistor=0.100 // --current-range=0.8
     
     // NOTE:  Performing a single measurement here assists with accuracy for initial measurements.
     single-measurement
@@ -344,29 +265,29 @@ class Driver:
     newMask     &= ~(CONF-MODE-MASK_)
     newMask     |= mode  //low value, no left shift offset
     reg_.write-u16-be REGISTER-CONFIG_ newMask
-    logger_.debug "measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
+    // logger_.debug "measure-mode set from 0x$(%02x oldMask) to 0x$(%02x newMask)"
     if (mode != MODE-POWER-DOWN_): last-measure-mode_ = mode
 
-  /** resistor-range --resistor --max-current: Set resistor and current range, independently 
+  /** shunt-resistor --resistor --max-current: Set resistor and current range, independently 
       Resistor value in ohm, Current range in A */
-  resistor-range --resistor/float --max-current/float -> none:
+  shunt-resistor --resistor/float --max-current/float -> none:
     shunt-resistor_        = resistor                                              // Cache to class-wide for later use
     max-current_           = max-current                                           // Cache to class-wide for later use
     current-LSB_           = (max-current_ / 32768.0)                              // Amps per bit (LSB)
-    logger_.debug "resistor-range: current per bit = $(current-LSB_)A"
+    logger_.debug "shunt-resistor: current per bit = $(current-LSB_)A"
     calibrationValue      := INTERNAL_SCALING_VALUE_ / (current-LSB_ * resistor)
-    logger_.debug "resistor-range: calibration value becomes = $(calibrationValue) $((calibrationValue).round)[rounded]"
+    logger_.debug "shunt-resistor: calibration value becomes = $(calibrationValue) $((calibrationValue).round)[rounded]"
     calibration-value --value=(calibrationValue).round
     current-divider-ma_    = 0.001 / current-LSB_
     power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
-    logger_.debug "resistor-range: (32767 * current-LSB_)=$(32767 * current-LSB_) compared to $(max-current_)"
+    logger_.debug "shunt-resistor: (32767 * current-LSB_)=$(32767 * current-LSB_) compared to $(max-current_)"
     // Check manually if necessary: assert: (32767 * current-LSB_ >= max-current_)
 
-  /** resistor-range --resistor: Set resistor range manually */
-  resistor-range --resistor/float -> none:
+  /** shunt-resistor --resistor: Set resistor range manually */
+  shunt-resistor --resistor/float -> none:
     // Current range - max measurable current given the shunt resistor
     current-max/float := ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/resistor
-    resistor-range --resistor=resistor --max-current=current-max
+    shunt-resistor --resistor=resistor --max-current=current-max
 
   // MEASUREMENT FUNCTIONS
 
@@ -377,6 +298,9 @@ class Driver:
 
   /** shunt-current --milliamps: Return shunt current in milliamps */   
   shunt-current --milliamps -> float:   return ((shunt-current --amps) * 1000.0)
+
+  /** shunt-current --microamps: Return shunt current in milliamps */   
+  shunt-current --microamps -> float:   return ((shunt-current --amps) * 1000.0 * 1000.0)
 
   /** shunt-voltage --volts: Return shunt voltage in volts */   
   shunt-voltage --volts -> float:
@@ -417,9 +341,10 @@ class Driver:
 
   // Aliases to help with user understanding of terms
   load-voltage --volts -> float:       return (bus-voltage --volts)
-  load-voltage --millivolts -> float:  return (bus-voltage --volts) * 1000.0
+  load-voltage --millivolts -> float:  return (bus-voltage --millivolts)
   load-current --amps -> float:        return (shunt-current --amps)
   load-current --milliamps -> float:   return (shunt-current --milliamps)
+  load-current --microamps -> float:   return (shunt-current --microamps)
 
   /** power-down: simple aliase for enabling device if disabled */
   power-down -> none:
@@ -466,21 +391,21 @@ class Driver:
   set-alert --type/int --limit/float -> none:
     alertLimit/float := 0.0
 
-    if type == INA-226-ALERT-SHUNT-OVER-VOLTAGE:
+    if type == INA226-ALERT-SHUNT-OVER-VOLTAGE:
       alertLimit = limit * 400          
-    else if type == INA-226-ALERT-SHUNT-UNDER-VOLTAGE:
+    else if type == INA226-ALERT-SHUNT-UNDER-VOLTAGE:
       alertLimit = limit * 400
-    else if type == INA-226-ALERT-CURRENT-OVER:
-      type = INA-226-ALERT-SHUNT-OVER-VOLTAGE
+    else if type == INA226-ALERT-CURRENT-OVER:
+      type = INA226-ALERT-SHUNT-OVER-VOLTAGE
       alertLimit = limit * 2048 * current-divider-ma_ / (calibration-value).to-float
-    else if type == INA-226-ALERT-CURRENT-UNDER:
-      type = INA-226-ALERT-SHUNT-UNDER-VOLTAGE
+    else if type == INA226-ALERT-CURRENT-UNDER:
+      type = INA226-ALERT-SHUNT-UNDER-VOLTAGE
       alertLimit = limit * 2048 * current-divider-ma_ / (calibration-value).to-float
-    else if type == INA-226-ALERT-BUS-OVER-VOLTAGE:
+    else if type == INA226-ALERT-BUS-OVER-VOLTAGE:
       alertLimit = limit * 800
-    else if type == INA-226-ALERT-BUS-UNDER-VOLTAGE:
+    else if type == INA226-ALERT-BUS-UNDER-VOLTAGE:
       alertLimit = limit * 800
-    else if type == INA-226-ALERT-POWER-OVER:
+    else if type == INA226-ALERT-POWER-OVER:
       alertLimit = limit / power-multiplier-mw_
     else:
       logger_.debug "set-alert: unexpected alert type"
@@ -671,7 +596,7 @@ class Driver:
     totalms := ((totalus + 999) / 1000).to-int  // ceil
     if totalms < 1: totalms = 1
 
-    logger_.debug "estimated-conversion-time: --ms is: $(totalms)ms"
+    //logger_.debug "estimated-conversion-time: --ms is: $(totalms)ms"
     return totalms
 
   // INFORMATION FUNCTIONS
