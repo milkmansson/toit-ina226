@@ -9,7 +9,7 @@ Simplest use case assumes an unmodified module with default wiring guidelines fo
 
 import gpio
 import i2c
-import ina226 show *
+import ..src.ina226 show *
 
 // Assumes default wiring and default module shunt 
 // resistor value of R100 (0.100 Ohm)
@@ -23,13 +23,13 @@ main:
   ina226-device := bus.device DEFAULT_I2C_ADDRESS
   ina226-driver := Ina226 ina226-device
 
-  ina226-driver.measure-mode --mode=INA226-MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests
-  ina226-driver.single-measurement                               // Wait for first registers to be ready (eg enough samples)
+  ina226-driver.set-measure-mode --mode=INA226-MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
+  ina226-driver.trigger-single-measurement                               // Wait for first registers to be ready (eg enough samples)
   
   // Continuously read and display values
   10.repeat:
     10.repeat:
-      print "Measurement $(%02d it): $(%0.1f (ina226-driver.load-current --milliamps))ma  $(%0.3f (ina226-driver.supply-voltage --volts))v  $(%0.2f (ina226-driver.load-power --milliwatts))mw"
+      print "Measurement $(%02d it): $(%0.1f (ina226-driver.read-shunt-current * 1000.0))ma  $(%0.3f (ina226-driver.read-supply-voltage))v  $(%0.2f (ina226-driver.read-load-power * 1000.0))mw"
       sleep --ms=500
 
     print "Waiting 30 seconds"

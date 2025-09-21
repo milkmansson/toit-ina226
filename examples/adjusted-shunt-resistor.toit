@@ -16,7 +16,7 @@ Shunt Resistor (SR) | Max Measurable Current | SR Wattage Reqt  | Resolution per
 
 import gpio
 import i2c
-import ina226 show *
+import ..src.ina226 show *
 
 main:
   frequency := 400_000
@@ -27,10 +27,10 @@ main:
   ina226-device := bus.device DEFAULT_I2C_ADDRESS
   ina226-driver := Ina226 ina226-device
 
-  ina226-driver.shunt-resistor --resistor=0.010                  // Reconfigure to the new 0.010 Ohm resistor
-  ina226-driver.measure-mode --mode=INA226-MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests
+  ina226-driver.set-shunt-resistor --resistor=0.010                  // Reconfigure to the new 0.010 Ohm resistor
+  ina226-driver.set-measure-mode --mode=INA226-MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
   
   // Continuously read and display values, in one row:
   10.repeat:
-    print "$(%0.1f (ina226-driver.load-current --microamps))ua  $(%0.3f (ina226-driver.supply-voltage --volts))v  $(%0.1f (ina226-driver.load-power --milliwatts))mw"
+    print "$(%0.1f (ina226-driver.read-shunt-current * 1000.0 * 1000.0))ua  $(%0.3f (ina226-driver.read-bus-voltage))v  $(%0.1f (ina226-driver.read-load-power * 1000))mw"
     sleep --ms=500
