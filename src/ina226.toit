@@ -104,7 +104,7 @@ class Ina226:
   // Actual INA226 device ID - to identify this chip over INA3221 etc.
   static INA226-DEVICE-ID_               ::= 0x0226
 
-  // Configuration Bitmasks.
+  // Configuration Register bitmasks.
   static CONF-RESET-MASK_                ::= 0x8000
   static CONF-AVERAGE-MASK_              ::= 0x0E00
   static CONF-AVERAGE-OFFSET_            ::= 9
@@ -199,7 +199,7 @@ class Ina226:
     reg_.write-u16-be REGISTER-CONFIG_ new-value
     sleep --ms=(get-estimated-conversion-time-ms)
     after-value := reg_.read-u16-be REGISTER-CONFIG_
-    logger_.info "reset_: 0x$(%04x old-value) [to 0x$(%04x new-value)] - after reset 0x$(%04x after-value)"
+    //logger_.info "reset_: 0x$(%04x old-value) [to 0x$(%04x new-value)] - after reset 0x$(%04x after-value)"
 
   /** 
   $get-calibration-value: Gets current calibration value.
@@ -356,11 +356,9 @@ class Ina226:
   The max current is computed from +/-81.92 mV full scale.
   */
   set-shunt-resistor --resistor/float -> none:
-    // Current range - max measurable current given the shunt resistor
+    // Current range - max measurable current given the shunt resistor.
     current-max/float := ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/resistor
     set-shunt-resistor --resistor=resistor --max-current=current-max
-
-  // MEASUREMENT FUNCTIONS
 
   /**
   $read-shunt-current: Return shunt current in amps. 
@@ -412,8 +410,6 @@ class Ina226:
     value := reg_.read-u16-be REGISTER-LOAD-POWER_
     return ((value * power-multiplier-mw_).to-float / 1000.0)
 
-  // INITIATING READS AND CONFIGURATIONS
-
   /** 
   $busy: Returns true if conversion is still ongoing 
   
@@ -454,8 +450,6 @@ class Ina226:
     mask-register-value/int   := reg_.read-u16-be REGISTER-MASK-ENABLE_        // Reading clears CNVR (Conversion Ready) Flag.
     config-register-value/int   := reg_.read-u16-be REGISTER-CONFIG_     
     reg_.write-u16-be REGISTER-CONFIG_ config-register-value                   // Starts conversion.
-
-  /** ALERT FUNCTIONS  */
 
   /** 
   $set-alert: configures the various alert types.
@@ -715,8 +709,6 @@ class Ina226:
     //logger_.debug "get-estimated-conversion-time-ms is: $(totalms)ms"
     return totalms
 
-  // INFORMATION FUNCTIONS
-
   /** 
   $read-manufacturer-id: Get Manufacturer identifier.
   
@@ -748,8 +740,6 @@ class Ina226:
     die-id-revision-id := (register & DIE-ID-RID-MASK_)
     //logger_.debug "device-revision: is 0x$(%04x dieidRid) [$(dieidRid)]"
     return die-id-revision-id
-
-  // TROUBLESHOOTING FUNCTIONS
 
   /** 
   $infer-shunt-resistor: Infer Shunt Resistor using a known load resistor.
@@ -818,7 +808,7 @@ class Ina226:
   /** 
   $print-diagnostics: Print Diagnostic Information.
   
-  Prints relevant measurement information to allow someone with a Voltmeter to double 
+  Prints relevant measurement information allowing someone with a Voltmeter to double 
   check what is measured and compare it.  Also calculates/compares using Ohms Law (V=I*R).
   */
   print-diagnostics -> none:
