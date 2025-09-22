@@ -52,6 +52,36 @@ This means the INA226 can be configured to trade off:
 - *Speed*: If quick updates are needed (e.g. sampling a fast-changing load) shorter conversion times are required.
 - vs. *Accuracy/noise rejection*: If very small currents are being measured (tiny shunt voltages), longer conversion times are required to average out noise.
 
+#### Measuring/Operating Modes
+The device has two measuring modes: Continuous and Triggered.
+
+###### Continuous Mode
+In continuous mode, the INA226 loops forever:
+- It repeatedly measures bus voltage and shunt voltage.
+- Each conversion result overwrites the previous one in the registers.
+- The sampling cadence is set by your conversion times + averaging settings.
+- Typical current draw is ~420 µA. 
+
+Use cases:
+- Requiring a live stream of current/voltage/power, e.g. logging consumption of an IoT node over hours.
+- In cases where the MCU needs to poll for measurements periodically, & expects the register to always hold the freshest value.
+- Best for steady-state loads or long-term monitoring.
+
+###### Triggered Mode
+In triggered (single-shot) mode:
+- The INA226 sits idle until a measurement is explicitly triggered (by writing to the config register).
+- It performs exactly one set of conversions (bus + shunt, with averaging if configured).
+- Then it goes back to idle (low power).
+- Each conversion uses ~330 µA during its active time (typically a few milliseconds).
+
+Use cases:
+- Low power consumption: e.g. wake up the INA226 once every few seconds/minutes, take a measurement, then let both the INA226 and MCU sleep.
+- Synchronized measurement: e.g. where a measurement is necessary at the same time a load is toggled, eg, so the measurement can be triggered at the right time after.
+- Useful in battery-powered applications where quiescent drain must be minimized.
+
+##### Power-Down Mode
+INA226 enters ultra-low-power state. No measurements happen. Supply current drops to ~0.1 µA (negligible). Useful for ultra-low power systems where periodic measurement isn't needed.
+
 #### Conversion Time
 The INA226 has an ADC (Analog-to-Digital Converter) inside.
 - measures shunt voltage (across IN+ and IN–).
@@ -76,30 +106,6 @@ Technically:
 The INA226 includes a flexible alert system that can drive an external pin, and/or be read in software.  Alerts can be configured for several conditions, such as over- or under-voltage (on the shunt or bus), over-current or over-power.  Additionally, it can be configured to trigger on 'conversion-ready' - a flag indicating that new data is available.  Only one alert function can be active at a time since the alert pin is shared.  
 The configuration registers allow thresholds to be set, configure alert latching behavior, and choose the alert pin polarity.  Because the alert mechanism is evaluated against the most recent ADC conversion, its response time is limited by the selected conversion times and averaging settings: longer averaging means more stable results but slower alerts.  This makes the feature most useful for catching sustained fault conditions (like over-current or brownout), rather than extremely fast transients.
 
-#### Measuring Mode
-The device has two measuring modes: Continuous and Triggered.
-
-###### Continuous Mode
-In continuous mode, the INA226 loops forever:
-- It repeatedly measures bus voltage and shunt voltage.
-- Each conversion result overwrites the previous one in the registers.
-- The sampling cadence is set by your conversion times + averaging settings.
-
-Use cases:
-- Requiring a live stream of current/voltage/power, e.g. logging consumption of an IoT node over hours.
-- In cases where the MCU needs to poll for measurements periodically, & expects the register to always hold the freshest value.
-- Best for steady-state loads or long-term monitoring.
-
-###### Triggered Mode
-In triggered (single-shot) mode:
-- The INA226 sits idle until a measurement is explicitly triggered (by writing to the config register).
-- It performs exactly one set of conversions (bus + shunt, with averaging if configured).
-- Then it goes back to idle (low power).
-
-Use cases:
-- Low power consumption: e.g. wake up the INA226 once every few seconds/minutes, take a measurement, then let both the INA226 and MCU sleep.
-- Synchronized measurement: e.g. where a measurement is necessary at the same time a load is toggled, eg, so the measurement can be triggered at the right time after.
-- Useful in battery-powered applications where quiescent drain must be minimized.
 
 ## Quick Start Information
 The following steps should get you operational quickly:
