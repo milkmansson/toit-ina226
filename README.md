@@ -102,6 +102,56 @@ Technically:
 - Shunt conversion time → how long it spends converting the shunt voltage (VSH = IN+ – IN−).
 - Current isn’t measured directly — it’s computed later from Vshunt ÷ Rshunt.
 
+#### Measurement Functions
+The INA226 measures two things natively:
+1. Vshunt = IN+ - IN-  (a small differential voltage across your shunt)
+2. Vbus   = the “bus/load” node voltage (most breakouts tie VBUS to IN−)
+
+From these, the driver computes current and power, and reconstructs the upstream supply.  Typical wiring on breakout boards: VBUS is internally tied to IN− (the low side of the shunt).  If your hardware is different (VBUS not tied to IN−), the meanings below still hold, but “bus voltage” is whatever is wired to VBUS. Most users only connect IN+ and IN−, which is sufficient for the readings shown.
+
+Units and scaling:
+- read-shunt-voltage:     volts (V).    LSB ≈ 2.5 µV internally.
+- read-bus-voltage:       volts (V).    LSB ≈ 1.25 mV internally.
+- read-shunt-current:     amps (A).     Derived from Vshunt and configured shunt resistor.
+- read-load-power:        watts (W).    Derived internally by the chip from current*25*LSB.
+- read-supply-voltage:    volts (V).    Reconstructed as Vbus + Vshunt.
+
+read-shunt-voltage -> float
+What it is:    The tiny voltage drop across your shunt: Vshunt = IN+ − IN−.
+Why you care:  It’s the raw signal that indicates load current (Ohm’s law: I = Vshunt / Rshunt).
+Typical magnitude:  Millivolts (mV) or tens/hundreds of microvolts at low current.
+Caveats: Sensitive to noise; use higher averaging/conversion time for stability.
+
+read-bus-voltage -> float
+What it is: The “load node” voltage. On most modules this is the same node as IN− i.e., what the load actually sees as its supply rail after the shunt.
+Why you care: It’s the real supply presented to your device-under-test (after shunt drop).
+Caveats: If your board does not tie VBUS to IN−, this returns whatever VBUS is wired to.
+
+read-supply-voltage -> float
+What it is: The upstream/source voltage *before* the shunt, reconstructed as: Vsupply ≈ Vbus + Vshunt = (voltage at IN−) + (IN+ − IN−) = voltage at IN+.
+Why you care:  Lets you see the source rail while only wiring IN+ and IN−.
+Caveats:
+- Assumes the usual low-side sense where Vbus reflects the IN− node.
+- For high currents, Vshunt may be a few to tens of mV; this adds directly.
+
+read-shunt-current -> float
+What it is: The current through the shunt and your load, in amps.
+How it’s obtained: Internally, the chip uses a calibration constant set from your configured shunt.
+Conceptually: I ≈ Vshunt / Rshunt (the driver scales the chip’s current register).
+Why you care: Primary measurement for load current.
+Caveats:
+- Accurate only if shunt value in code matches your physical shunt.
+- Choose appropriate averaging/conversion time for the dynamic you need.
+
+read-load-power -> float
+What it is: Power delivered to the load (approx. Vbus * I), in watts.
+How it’s obtained: Uses the INA226 power register (which multiplies measured current by an internal factor).
+Why you care: One-call view of how much power your device is drawing.
+Caveats:
+- Because Vbus is after the shunt, this approximates power at the load (not at the source).
+- Depends on correct calibration (shunt value).
+
+
 #### Alerting
 The INA226 includes a flexible alert system that can drive an external pin, and/or be read in software.  Alerts can be configured for several conditions, such as over- or under-voltage (on the shunt or bus), over-current or over-power.  Additionally, it can be configured to trigger on 'conversion-ready' - a flag indicating that new data is available.  Only one alert function can be active at a time since the alert pin is shared.  
 The configuration registers allow thresholds to be set, configure alert latching behavior, and choose the alert pin polarity.  Because the alert mechanism is evaluated against the most recent ADC conversion, its response time is limited by the selected conversion times and averaging settings: longer averaging means more stable results but slower alerts.  This makes the feature most useful for catching sustained fault conditions (like over-current or brownout), rather than extremely fast transients.
@@ -117,31 +167,6 @@ The following steps should get you operational quickly:
 ## Detailed Information
 In order for this device to work, several things are done in code:
 - Setting of a conversion value 
-
-
-### Core Mathematical Principles
-The INA226 measures two things directly:
-1. Shunt voltage (Vsh) — the tiny voltage across the shunt resistor.
-2. Bus voltage (Vbus) — the supply/load voltage referenced to ground.
-From these, it derives current and power. The key math pieces are:
-- Ohm’s Law: I = Vsh / Rsh
-  Current equals the measured shunt voltage divided by the known shunt resistor value.
-- Current LSB (Least Significant Bit):
-  The INA226 doesn’t report current directly in amps. Instead, it stores a raw integer in the current register. Each “count” (LSB) of that register corresponds to some fraction of an amp:
-  I(LSB) = I(max) / 32768
-  ..where I(max) is the maximum expected current.
-Calibration Register:
-To link the hardware to the chosen shunt resistor and current range, you program the calibration value:
-Cal = 0.00512 / ( I(LSB) * R(sh) )
-The device uses this to scale raw readings into real-world amps and watts.
-Current from Register:
-I = (raw current register) * I(LSB)
-Power:
-The INA226 multiplies the bus voltage and current internally and scales it. Each bit of the power register represents:
- P(LSB) = 25 × I(LSB)
-So, once calibrated, it can always be checked by:
-- Current: proportional to raw counts × I(LSB).
-- Power: proportional to raw counts × 25 × I(LSB).
 
 ## Changing the Shunt Resistor
 Many cheap INA226 modules ship with 0.1 Ω or 0.01 Ω shunts.
