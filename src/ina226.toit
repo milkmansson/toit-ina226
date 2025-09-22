@@ -10,69 +10,81 @@ import serial.device as serial
 import serial.registers as registers
 
 /**
-Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/.  There are others with different feature sets and may be partially code compatible.
+Toit Driver Library for an INA226 module, DC Shunt current and power sensor.
+
+Several common modules exist based on the TI INA226 chip. 
+Datasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf 
+One example: https://esphome.io/components/sensor/ina226/.  There are others with different
+feature sets and may be partially code compatible.
 - For all sensor reads, values are floats, and supplied in base SI units: volts, amps and watts.
 - get-* and set-* methods/functions are used for setting properties about the class or the sensor itself.
 - read-* methods/functions are used for getting reading actual sensor values 
 
-To use this library, first consult the examples.  Several values need setting before data will be available.  These are set using the class to default values to allow for immediate use.  
-- If the shunt resistor is not R100 (0.100 Ohm) ensure to set this directly after intantiation.  See the examples.
-- Ensure sample size is set appropriately - a higher sample size will ensure more stable measurements.
+To use this library, first consult the examples.  Several values need setting before data will
+be available.  These are set using the class to default values to allow for immediate use.  
+- Most variants I have personally seeen have an R100 shunt resistor.  If the shunt resistor is
+  not R100 (0.100 Ohm) ensure to set this in the class after intantiation.  (See the examples!)
+- Ensure sample size is set appropriately - a higher sample size will ensure more stable 
+  measurements, although changes will be slower to be visible.
 
 Examples in the `examples` folder:
-- Use Case 1: Simple Continuous Measurement.
+- Use Case 1: Simple Continuous Measurement.  The simplest use case.
 - Use Case 2: Adjusting the Shunt Resistor to measure (for example, smaller) currents.
 - Use Case 3: Triggered Updates - low power mode for infrequent/intermittent updates.
 */
 
-// $DEFAULT-I2C-ADDRESS is 64 (0x40) with jumper defaults.
-// Valid address values: 64 to 79 - See datasheet table 6-2
-DEFAULT-I2C-ADDRESS                      ::= 0x40
-
-/** 
-Mode constants to be used by users during configuration with $Ina226.set-measure-mode
-*/
-INA226-MODE-POWER-DOWN                          ::= 0x00
-INA226-MODE-TRIGGERED                           ::= 0x03
-INA226-MODE-CONTINUOUS                          ::= 0x07 // Class Default.
-
-/**
-Alert Types that can set off the alert register and/or alert pin. See $Ina226.set-alert
-*/
-INA226-ALERT-SHUNT-OVER-VOLTAGE                 ::= 0x8000
-INA226-ALERT-SHUNT-UNDER-VOLTAGE                ::= 0x4000
-INA226-ALERT-BUS-OVER-VOLTAGE                   ::= 0x2000
-INA226-ALERT-BUS-UNDER-VOLTAGE                  ::= 0x1000
-INA226-ALERT-POWER-OVER                         ::= 0x0800
-INA226-ALERT-CURRENT-OVER                       ::= 0xFFFE
-INA226-ALERT-CURRENT-UNDER                      ::= 0xFFFF
-INA226-ALERT-CONVERSION-READY                   ::= 0x0400
-
-/** 
-Sampling options used for measurements. To be used with $Ina226.set-sampling-rate
-*/
-INA226-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default.
-INA226-AVERAGE-4-SAMPLES                        ::= 0x0001
-INA226-AVERAGE-16-SAMPLES                       ::= 0x0002
-INA226-AVERAGE-64-SAMPLES                       ::= 0x0003
-INA226-AVERAGE-128-SAMPLES                      ::= 0x0004
-INA226-AVERAGE-256-SAMPLES                      ::= 0x0005
-INA226-AVERAGE-512-SAMPLES                      ::= 0x0006
-INA226-AVERAGE-1024-SAMPLES                     ::= 0x0007
-
-/** 
-Bus and Shunt conversion timing options. To be used with $Ina226.set-conversion-time
-*/
-INA226-TIMING-140-US                            ::= 0x0000
-INA226-TIMING-204-US                            ::= 0x0001
-INA226-TIMING-332-US                            ::= 0x0002
-INA226-TIMING-588-US                            ::= 0x0003
-INA226-TIMING-1100-US                           ::= 0x0004 // Chip Default.
-INA226-TIMING-2100-US                           ::= 0x0005
-INA226-TIMING-4200-US                           ::= 0x0006
-INA226-TIMING-8300-US                           ::= 0x0007
 
 class Ina226:
+  /**
+  Default $I2C-ADDRESS is 64 (0x40) with jumper defaults.
+  
+  Valid address values: 64 to 79 - See datasheet table 6-2
+  */
+  static I2C-ADDRESS                     ::= 0x40
+
+  /** 
+  MODE constants to be used by users during configuration with $set-measure-mode
+  */
+  static MODE-POWER-DOWN                 ::= 0x00
+  static MODE-TRIGGERED                  ::= 0x03
+  static MODE-CONTINUOUS                 ::= 0x07 // Class Default.
+
+  /**
+  Alert Types that can set off the alert register and/or alert pin. See $set-alert
+  */
+  static ALERT-SHUNT-OVER-VOLTAGE        ::= 0x8000
+  static ALERT-SHUNT-UNDER-VOLTAGE       ::= 0x4000
+  static ALERT-BUS-OVER-VOLTAGE          ::= 0x2000
+  static ALERT-BUS-UNDER-VOLTAGE         ::= 0x1000
+  static ALERT-POWER-OVER                ::= 0x0800
+  static ALERT-CURRENT-OVER              ::= 0xFFFE
+  static ALERT-CURRENT-UNDER             ::= 0xFFFF
+  static ALERT-CONVERSION-READY          ::= 0x0400
+
+  /** 
+  Sampling options used for measurements. To be used with $set-sampling-rate
+  */
+  static AVERAGE-1-SAMPLE                ::= 0x0000 // Chip Default.
+  static AVERAGE-4-SAMPLES               ::= 0x0001
+  static AVERAGE-16-SAMPLES              ::= 0x0002
+  static AVERAGE-64-SAMPLES              ::= 0x0003
+  static AVERAGE-128-SAMPLES             ::= 0x0004
+  static AVERAGE-256-SAMPLES             ::= 0x0005
+  static AVERAGE-512-SAMPLES             ::= 0x0006
+  static AVERAGE-1024-SAMPLES            ::= 0x0007
+
+  /** 
+  Bus and Shunt conversion timing options. To be used with $set-conversion-time
+  */
+  static TIMING-140-US                   ::= 0x0000
+  static TIMING-204-US                   ::= 0x0001
+  static TIMING-332-US                   ::= 0x0002
+  static TIMING-588-US                   ::= 0x0003
+  static TIMING-1100-US                  ::= 0x0004 // Chip Default.
+  static TIMING-2100-US                  ::= 0x0005
+  static TIMING-4200-US                  ::= 0x0006
+  static TIMING-8300-US                  ::= 0x0007
+
   // Core Register Addresses.
   static REGISTER-CONFIG_                ::= 0x00  //RW  // All-register reset, shunt voltage and bus voltage ADC conversion times and averaging, operating mode.
   static REGISTER-SHUNT-VOLTAGE_         ::= 0x01  //R   // Shunt voltage measurement data.
@@ -88,6 +100,9 @@ class Ina226:
   // Die & Manufacturer Info Masks (Masking REGISTER-DIE-ID_ register)
   static DIE-ID-RID-MASK_                ::= 0x000F // Masks its part of the REGISTER-DIE-ID Register.
   static DIE-ID-DID-MASK_                ::= 0xFFF0 // Masks its part of the REGISTER-DIE-ID Register.
+
+  // Actual INA226 device ID - to identify this chip over INA3221 etc.
+  static INA226-DEVICE-ID_               ::= 0x0226
 
   // Configuration Bitmasks.
   static CONF-RESET-MASK_                ::= 0x8000
@@ -123,18 +138,11 @@ class Ina226:
   static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
   static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 0.08192  // volts.
 
-  // 'Measure Mode' (includes OFF).
-  static MODE-POWER-DOWN_                         ::= 0x00
-  static MODE-TRIGGERED_                          ::= 0x03
-  static MODE-CONTINUOUS_                         ::= 0x07
-
-  static INA226-DEVICE-ID                         ::= 0x0226
-
   reg_/registers.Registers                        := ?       // set by contructor.
   logger_/log.Logger                              := ?       // set by contructor.
   current-divider-ma_/float                       := 0.0
   power-multiplier-mw_/float                      := 0.0
-  last-measure-mode_/int                          := INA226-MODE-CONTINUOUS
+  last-measure-mode_/int                          := MODE-CONTINUOUS
   current-LSB_/float                              := 0.0
   shunt-resistor_/float                           := 0.0
   current-range_/float                            := 0.0
@@ -144,8 +152,8 @@ class Ina226:
     logger_ = logger
     reg_ = dev.registers
 
-    if (read-device-identification != INA226-DEVICE-ID): 
-      logger_.info "Device is NOT an INA226 (0x$(%04x INA226-DEVICE-ID) [Device ID:0x$(%04x read-device-identification)]) "
+    if (read-device-identification != INA226-DEVICE-ID_): 
+      logger_.info "Device is NOT an INA226 (0x$(%04x INA226-DEVICE-ID_) [Device ID:0x$(%04x read-device-identification)]) "
       logger_.info "Device is man-id=0x$(%04x read-manufacturer-id) dev-id=0x$(%04x read-device-identification) rev=0x$(%04x read-device-revision)"
       throw "Device is not an INA226."
 
@@ -168,10 +176,10 @@ class Ina226:
     reset_
 
     // Initialise Default sampling, conversion timing, and measuring mode.
-    set-sampling-rate --rate=INA226-AVERAGE-1-SAMPLE
-    set-conversion-time --bus=INA226-TIMING-1100-US     // Chip Default.  Shown here for clarity.
-    set-conversion-time --shunt=INA226-TIMING-1100-US   // Chip Default.  Shown here for clarity.
-    set-measure-mode --mode=MODE-CONTINUOUS_
+    set-sampling-rate --rate=AVERAGE-1-SAMPLE
+    set-conversion-time --bus=TIMING-1100-US     // Chip Default.  Shown here for clarity.
+    set-conversion-time --shunt=TIMING-1100-US   // Chip Default.  Shown here for clarity.
+    set-measure-mode --mode=MODE-CONTINUOUS
 
     // Set Defaults for Shunt Resistor - module usually ships with R100. (0.100 Ohm)
     set-shunt-resistor --resistor=0.100
@@ -307,13 +315,13 @@ class Ina226:
     new-value     &= ~(CONF-MODE-MASK_)
     new-value     |= mode                 // low value, no left shift offset.
     reg_.write-u16-be REGISTER-CONFIG_ new-value
-    if (mode != MODE-POWER-DOWN_): last-measure-mode_ = mode
+    if (mode != MODE-POWER-DOWN): last-measure-mode_ = mode
 
   /**
   $set-power-off: simple alias for disabling device.
   */
   set-power-off -> none:
-    set-measure-mode --mode=MODE-POWER-DOWN_
+    set-measure-mode --mode=MODE-POWER-DOWN
 
   /**
   $set-power-on: simple alias for enabling the device.
@@ -452,21 +460,21 @@ class Ina226:
   set-alert --type/int --limit/float -> none:
     alert-limit/float := 0.0
 
-    if type == INA226-ALERT-SHUNT-OVER-VOLTAGE:
+    if type == ALERT-SHUNT-OVER-VOLTAGE:
       alert-limit = limit * 400          
-    else if type == INA226-ALERT-SHUNT-UNDER-VOLTAGE:
+    else if type == ALERT-SHUNT-UNDER-VOLTAGE:
       alert-limit = limit * 400
-    else if type == INA226-ALERT-CURRENT-OVER:
-      type = INA226-ALERT-SHUNT-OVER-VOLTAGE
+    else if type == ALERT-CURRENT-OVER:
+      type = ALERT-SHUNT-OVER-VOLTAGE
       alert-limit = limit * 2048 * current-divider-ma_ / (get-calibration-value).to-float
-    else if type == INA226-ALERT-CURRENT-UNDER:
-      type = INA226-ALERT-SHUNT-UNDER-VOLTAGE
+    else if type == ALERT-CURRENT-UNDER:
+      type = ALERT-SHUNT-UNDER-VOLTAGE
       alert-limit = limit * 2048 * current-divider-ma_ / (get-calibration-value).to-float
-    else if type == INA226-ALERT-BUS-OVER-VOLTAGE:
+    else if type == ALERT-BUS-OVER-VOLTAGE:
       alert-limit = limit * 800
-    else if type == INA226-ALERT-BUS-UNDER-VOLTAGE:
+    else if type == ALERT-BUS-UNDER-VOLTAGE:
       alert-limit = limit * 800
-    else if type == INA226-ALERT-POWER-OVER:
+    else if type == ALERT-POWER-OVER:
       alert-limit = limit / power-multiplier-mw_
     else:
       logger_.debug "set-alert: unexpected alert type"
@@ -638,14 +646,14 @@ class Ina226:
   */
   get-conversion-time-us-from-enum --code/int -> int:
     assert: 0 <= code <= 7
-    if code == INA226-TIMING-140-US:  return 140
-    if code == INA226-TIMING-204-US:  return 204
-    if code == INA226-TIMING-332-US:  return 332
-    if code == INA226-TIMING-588-US:  return 588
-    if code == INA226-TIMING-1100-US: return 1100
-    if code == INA226-TIMING-2100-US: return 2100
-    if code == INA226-TIMING-4200-US: return 4200
-    if code == INA226-TIMING-8300-US: return 8300
+    if code == TIMING-140-US:  return 140
+    if code == TIMING-204-US:  return 204
+    if code == TIMING-332-US:  return 332
+    if code == TIMING-588-US:  return 588
+    if code == TIMING-1100-US: return 1100
+    if code == TIMING-2100-US: return 2100
+    if code == TIMING-4200-US: return 4200
+    if code == TIMING-8300-US: return 8300
     return 1100  // default/defensive - should never happen
 
   /** 
@@ -653,14 +661,14 @@ class Ina226:
   */
   get-sampling-rate-from-enum --code/int -> int:
     assert: 0 <= code <= 7
-    if code == INA226-AVERAGE-1-SAMPLE:     return 1
-    if code == INA226-AVERAGE-4-SAMPLES:    return 4
-    if code == INA226-AVERAGE-16-SAMPLES:   return 16
-    if code == INA226-AVERAGE-64-SAMPLES:   return 64
-    if code == INA226-AVERAGE-128-SAMPLES:  return 128
-    if code == INA226-AVERAGE-256-SAMPLES:  return 256
-    if code == INA226-AVERAGE-512-SAMPLES:  return 512
-    if code == INA226-AVERAGE-1024-SAMPLES: return 1024
+    if code == AVERAGE-1-SAMPLE:     return 1
+    if code == AVERAGE-4-SAMPLES:    return 4
+    if code == AVERAGE-16-SAMPLES:   return 16
+    if code == AVERAGE-64-SAMPLES:   return 64
+    if code == AVERAGE-128-SAMPLES:  return 128
+    if code == AVERAGE-256-SAMPLES:  return 256
+    if code == AVERAGE-512-SAMPLES:  return 512
+    if code == AVERAGE-1024-SAMPLES: return 1024
     return 1  // default/defensive - should never happen
 
 

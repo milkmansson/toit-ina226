@@ -1,18 +1,19 @@
-/** Simple Continuous Measurements:
-Simplest use case assumes an unmodified module with default wiring guidelines followed.  (Please see the Readme for pointers & guidance.) Assumes:
- - Module shunt resistor value R100 (0.1 Ohm)
- - Sample size of 1 (eg, no averaging)
- - Conversion time of 1100us
- - Continuous Mode
-
-*/
 
 import gpio
 import i2c
 import ..src.ina226 show *
 
-// Assumes default wiring and default module shunt 
-// resistor value of R100 (0.100 Ohm)
+/** 
+Simple Continuous Measurements Example
+
+Simplest use case assumes an unmodified module with default wiring guidelines followed.  
+(Please see the Readme for pointers & guidance.) This example assumes:
+ - Module shunt resistor value R100 (0.1 Ohm)
+ - Sample size of 1 (eg, no averaging)
+ - Conversion time of 1100us
+ - Continuous Mode
+ - Default wiring and default module shunt (see docs.)
+*/
 
 main:
   frequency := 400_000
@@ -20,10 +21,10 @@ main:
   scl := gpio.Pin 25
   bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
 
-  ina226-device := bus.device DEFAULT_I2C_ADDRESS
+  ina226-device := bus.device Ina226.I2C_ADDRESS
   ina226-driver := Ina226 ina226-device
 
-  ina226-driver.set-measure-mode --mode=INA226-MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
+  ina226-driver.set-measure-mode --mode=Ina226.MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
   ina226-driver.trigger-single-measurement                               // Wait for first registers to be ready (eg enough samples)
   
   // Continuously read and display values
