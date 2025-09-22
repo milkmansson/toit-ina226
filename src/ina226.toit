@@ -74,7 +74,9 @@ class Ina226:
   static AVERAGE-1024-SAMPLES            ::= 0x0007
 
   /** 
-  Bus and Shunt conversion timing options. To be used with $set-conversion-time
+  Bus and Shunt conversion timing options. 
+  
+  To be used with $set-bus-conversion-time and $set-shunt-conversion-time
   */
   static TIMING-140-US                   ::= 0x0000
   static TIMING-204-US                   ::= 0x0001
@@ -97,7 +99,7 @@ class Ina226:
   static REGISTER-MANUF-ID_              ::= 0xFE  //R   // Contains unique manufacturer identification number.
   static REGISTER-DIE-ID_                ::= 0xFF  //R   // Contains unique die identification number.
 
-  // Die & Manufacturer Info Masks (Masking REGISTER-DIE-ID_ register)
+  // Die & Manufacturer Info Masks. (Masking REGISTER-DIE-ID_ register.)
   static DIE-ID-RID-MASK_                ::= 0x000F // Masks its part of the REGISTER-DIE-ID Register.
   static DIE-ID-DID-MASK_                ::= 0xFFF0 // Masks its part of the REGISTER-DIE-ID Register.
 
@@ -157,7 +159,7 @@ class Ina226:
       logger_.info "Device is man-id=0x$(%04x read-manufacturer-id) dev-id=0x$(%04x read-device-identification) rev=0x$(%04x read-device-revision)"
       throw "Device is not an INA226."
 
-    initialise-device_
+    initialize-device_
 
   /** 
   Initial Device Configuration - Starts:
@@ -168,21 +170,21 @@ class Ina226:
   register defaults to '0', yielding zero current and power values until the Calibration 
   register is programmed.  The setting of the resistor value writes the initial calibration 
   value, initial average value and conversion time.  Therefore, this constructor runs the 
-  private method '$initialise-device_'.  If a different shunt resistor is used, this must be
+  private method '$initialize-device_'.  If a different shunt resistor is used, this must be
   set directly after the object is instantiated.
   */
-  initialise-device_ -> none:
+  initialize-device_ -> none:
     // Maybe not required but the manual suggests you should do it.
     reset_
 
-    // Initialise Default sampling, conversion timing, and measuring mode.
-    set-sampling-rate --rate=AVERAGE-1-SAMPLE
-    set-conversion-time --bus=TIMING-1100-US     // Chip Default.  Shown here for clarity.
-    set-conversion-time --shunt=TIMING-1100-US   // Chip Default.  Shown here for clarity.
-    set-measure-mode --mode=MODE-CONTINUOUS
+    // Initialize Default sampling, conversion timing, and measuring mode.
+    set-sampling-rate AVERAGE-1-SAMPLE
+    set-bus-conversion-time TIMING-1100-US     // Chip Default.  Shown here for clarity.
+    set-shunt-conversion-time TIMING-1100-US   // Chip Default.  Shown here for clarity.
+    set-measure-mode MODE-CONTINUOUS
 
     // Set Defaults for Shunt Resistor - module usually ships with R100. (0.100 Ohm)
-    set-shunt-resistor --resistor=0.100
+    set-shunt-resistor 0.100
     
     // Performing a single measurement during initialisation assists with accuracy for first reads.
     trigger-single-measurement
@@ -220,13 +222,13 @@ class Ina226:
   factors. This value is caluclated automatically by the $set-shunt-resistor method - setting
   manually is not normally required.  See Datasheet pp.10.
   */
-  set-calibration-value --value/int -> none:
+  set-calibration-value value/int -> none:
     old-value := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
     logger_.debug "calibration-value: changed from $(old-value) to $(value)"
 
   /** 
-  $set-sampling-rate --rate: Adjust Sampling Rate for measurements.  
+  $set-sampling-rate rate: Adjust Sampling Rate for measurements.  
   
   The sampling rate determines how often the device samples and averages the input 
   signals (bus voltage and shunt voltage) before storing them in the result registers.
@@ -234,11 +236,11 @@ class Ina226:
   single measurement.  This is the register code/enum value, not actual rate. Can be
   converted back using  $get-sampling-rate --count={enum}
   */
-  set-sampling-rate --rate/int -> none:
+  set-sampling-rate code/int -> none:
     old-value/int  := reg_.read-u16-be REGISTER-CONFIG_
     new-value/int  := old-value
     new-value      &= ~(CONF-AVERAGE-MASK_)
-    new-value      |= (rate << 9)
+    new-value      |= (code << 9)
     reg_.write-u16-be REGISTER-CONFIG_ new-value
     logger_.debug "sampling-rate: set from 0x$(%02x old-value) to 0x$(%02x new-value)"
 
@@ -250,12 +252,12 @@ class Ina226:
   More samples lead to more stable values, but can lengthen the time required for a
   single measurement.
   */
-  get-sampling-rate --code -> int:
+  get-sampling-rate -> int:
     return ((reg_.read-u16-be REGISTER-CONFIG_ & CONF-AVERAGE-MASK_) >> 9)
 
   /** $get-sampling-rate --count: Return human readable sampling count number. */
-  get-sampling-rate --count -> int:
-    return get-sampling-rate-from-enum --code=(get-sampling-rate --code)
+  get-sampling-rate-us -> int:
+    return get-sampling-rate-from-enum get-sampling-rate
 
   /**
   Conversion Time:  The time spent by the ADC on a single measurement. 
@@ -270,26 +272,26 @@ class Ina226:
   */
 
   /**
-  $set-conversion-time --bus: Sets conversion-time for bus only. See 'Conversion Time'.
+  $set-bus-conversion-time: Sets conversion-time for bus only. See 'Conversion Time'.
   */  
-  set-conversion-time --bus/int -> none:
+  set-bus-conversion-time bus/int -> none:
     old-value/int := reg_.read-u16-be REGISTER-CONFIG_
     new-value/int := old-value
     new-value     &= ~CONF-BUSVC-MASK_
     new-value     |= (bus << CONF-BUSVC-OFFSET_)
     reg_.write-u16-be REGISTER-CONFIG_ new-value
-    logger_.debug "conversion-time: --bus REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
+    logger_.debug "set-bus-conversion-time: REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
 
   /**
-  $set-conversion-time --shunt: Sets conversion-time for shunt only. See 'Conversion Time'.
+  $set-shunt-conversion-time: Sets conversion-time for shunt only. See 'Conversion Time'.
   */  
-  set-conversion-time --shunt/int -> none:
+  set-shunt-conversion-time shunt/int -> none:
     old-value/int := reg_.read-u16-be REGISTER-CONFIG_
     new-value/int := old-value
     new-value     &= ~CONF-SHUNTVC-MASK_
     new-value     |= (shunt << CONF-SHUNTVC-OFFSET_)
     reg_.write-u16-be REGISTER-CONFIG_ new-value
-    logger_.debug "conversion-time: --shunt REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
+    logger_.debug "set-shunt-conversion-time: REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
 
   /** 
   $set-measure-mode: Sets Measure Mode. 
@@ -309,7 +311,7 @@ class Ina226:
 
   See section 6.6 of the Datasheet 'Electrical Characteristics'.
   */
-  set-measure-mode --mode/int -> none:
+  set-measure-mode mode/int -> none:
     old-value/int := reg_.read-u16-be REGISTER-CONFIG_
     new-value/int := old-value
     new-value     &= ~(CONF-MODE-MASK_)
@@ -321,7 +323,7 @@ class Ina226:
   $set-power-off: simple alias for disabling device.
   */
   set-power-off -> none:
-    set-measure-mode --mode=MODE-POWER-DOWN
+    set-measure-mode MODE-POWER-DOWN
 
   /**
   $set-power-on: simple alias for enabling the device.
@@ -329,36 +331,26 @@ class Ina226:
   Resets to the last mode set by $set-measure-mode.
   */
   set-power-on -> none:
-    set-measure-mode --mode=last-measure-mode_
+    set-measure-mode last-measure-mode_
     sleep --ms=(get-estimated-conversion-time-ms)
 
   /**
   $set-shunt-resistor --resistor --max-current: Set resistor and current range.
   
-  Resistor value in ohm, Current range in amps.
+  Set shunt resistor value, input is in Ohms. If no --max-current is computed from +/-81.92 mV full scale. 
+  Current range in amps.
   */
-  set-shunt-resistor --resistor/float --max-current/float -> none:
+  set-shunt-resistor resistor/float --max-current/float=(ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/resistor) -> none:
     shunt-resistor_        = resistor                                              // Cache to class-wide for later use.
     max-current_           = max-current                                           // Cache to class-wide for later use.
     current-LSB_           = (max-current_ / 32768.0)                              // Amps per bit (eg. LSB).
     //logger_.debug "shunt-resistor: current per bit = $(current-LSB_)A"
-    new-calibration-value := INTERNAL_SCALING_VALUE_ / (current-LSB_ * resistor)
+    new-calibration-value  := INTERNAL_SCALING_VALUE_ / (current-LSB_ * resistor)
     //logger_.debug "shunt-resistor: calibration value becomes = $(new-calibration-value) $((new-calibration-value).round)[rounded]"
-    set-calibration-value --value=(new-calibration-value).round
+    set-calibration-value  (new-calibration-value).round
     current-divider-ma_    = 0.001 / current-LSB_
     power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
     logger_.debug "shunt-resistor: (32767 * current-LSB_)=$(32767 * current-LSB_) compared to $(max-current_)"
-
-  /**
-  $set-shunt-resistor --resistor: 
-  
-  Set shunt resistor value manually, assuming maximum current. Resistor value input is in Ohms.
-  The max current is computed from +/-81.92 mV full scale.
-  */
-  set-shunt-resistor --resistor/float -> none:
-    // Current range - max measurable current given the shunt resistor.
-    current-max/float := ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/resistor
-    set-shunt-resistor --resistor=resistor --max-current=current-max
 
   /**
   $read-shunt-current: Return shunt current in amps. 
@@ -506,7 +498,7 @@ class Ina226:
   - 1 = Latch enabled
   - 0 = Transparent (default)
   */
-  set-alert-latch --set/int -> none:
+  set-alert-latch set/int -> none:
     assert: 0 <= set <= 1
     old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     new-value/int := old-value
@@ -530,7 +522,7 @@ class Ina226:
   - 1 = Inverted (active-high open collector).
   - 0 = Normal (active-low open collector) (default).
   */
-  set-alert-pin-polarity --set/int -> none:
+  set-alert-pin-polarity set/int -> none:
     assert: 0 <= set <= 1
     old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     new-value/int := old-value
@@ -624,7 +616,7 @@ class Ina226:
   $set-conversion-ready --set/int: Configure the alert function enabling the pin to
   be used to signal conversion ready.
   */
-  set-conversion-ready --set/int -> none:
+  set-conversion-ready set/int -> none:
     assert: 0 <= set <= 1
     old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     new-value/int := old-value
@@ -637,18 +629,18 @@ class Ina226:
   $set-conversion-ready --enable-alert-pin: Helpful alias for setting 'conversion-ready' on alert pin.
   */
   set-conversion-ready --enable-alert-pin -> none:
-    set-conversion-ready --set=1
+    set-conversion-ready 1
 
   /** 
   $set-conversion-ready --disable-alert-pin: Helpful alias for setting 'conversion-ready' on alert pin.
   */
   set-conversion-ready --disable-alert-pin -> none:
-    set-conversion-ready --set=0
+    set-conversion-ready 0
 
   /**
   $get-conversion-time-us-from-enum: Returns microsecs for TIMING-x-US statics 0..7 (values as stored in the register).
   */
-  get-conversion-time-us-from-enum --code/int -> int:
+  get-conversion-time-us-from-enum code/int -> int:
     assert: 0 <= code <= 7
     if code == TIMING-140-US:  return 140
     if code == TIMING-204-US:  return 204
@@ -663,7 +655,7 @@ class Ina226:
   /** 
   $get-sampling-rate-from-enum: Returns sample count for AVERAGE-x-SAMPLE statics 0..7 (values as stored in the register).
   */
-  get-sampling-rate-from-enum --code/int -> int:
+  get-sampling-rate-from-enum code/int -> int:
     assert: 0 <= code <= 7
     if code == AVERAGE-1-SAMPLE:     return 1
     if code == AVERAGE-4-SAMPLES:    return 4
@@ -691,9 +683,9 @@ class Ina226:
     shunt-conversion-time-code/int    := (config-reg-value & CONF-SHUNTVC-MASK_)  >> CONF-SHUNTVC-OFFSET_
     mode/int                          := (config-reg-value & CONF-MODE-MASK_)     >> CONF-MODE-OFFSET_
 
-    sampling-rate/int                 := get-sampling-rate-from-enum --code=samples-code
-    bus-conversion-time/int           := get-conversion-time-us-from-enum --code=bus-conversion-time-code
-    shunt-conversion-time/int         := get-conversion-time-us-from-enum --code=shunt-conversion-time-code
+    sampling-rate/int                 := get-sampling-rate-from-enum samples-code
+    bus-conversion-time/int           := get-conversion-time-us-from-enum bus-conversion-time-code
+    shunt-conversion-time/int         := get-conversion-time-us-from-enum shunt-conversion-time-code
 
     // Mode 0x7 = bus+shunt continuous, 0x3 = bus+shunt triggered (single-shot).
     // If converting to support bus-only or shunt-only modes, drop the other term.
@@ -740,70 +732,6 @@ class Ina226:
     die-id-revision-id := (register & DIE-ID-RID-MASK_)
     //logger_.debug "device-revision: is 0x$(%04x dieidRid) [$(dieidRid)]"
     return die-id-revision-id
-
-  /** 
-  $infer-shunt-resistor: Infer Shunt Resistor using a known load resistor.
-  
-  Averages a few samples for stability, ensures both voltages come from the same
-  conversion, and returns the estimated shunt value.
-  
-  On Accuracy:
-  - Known load tolerance dominates: use a 0.1–1% resistor if possible.
-  - Make sure VBUS & load node (IN−) are tied.
-  - Kelvin the shunt if possible: sense pins at the shunt pads.
-  - Perform test/readings after the load settles - average some samples.
-  - Low-current corner: if Vshunt is just a few tens of µV, quantization/noise can
-    move the estimate; use a load that draws a few mA+ to get a clean mV-level Vsh.
-  */
-  infer-shunt-resistor --load-resistor/float -> float:
-    assert: load-resistor > 0.0
-
-    // Make sure we read one coherent conversion.
-    trigger-single-measurement
-    wait-until-conversion-completed
-
-    // Light Averaging
-    load-voltage-sum/float       := 0.0
-    shunt-voltage-sum/float      := 0.0
-    samples/int                  := 8
-    samples.repeat:
-      load-voltage-sum           += read-bus-voltage
-      shunt-voltage-sum          += read-shunt-voltage
-
-    // Replace values with calculated average.
-    load-voltage/float          := load-voltage-sum / samples.to-float
-    shunt-voltage/float         := shunt-voltage-sum / samples.to-float
-
-    // Estimate current via Ohm's law on the known load.
-    current-estimate/float := load-voltage / load-resistor
-    assert: current-estimate > 0.0
-
-    shunt-resistor-estimate/float := shunt-voltage / current-estimate
-    logger_.debug "infer-shunt-resistor: Vload=$(load-voltage) V  Vsh=$(shunt-voltage) V  Rload=$(load-resistor) Ohm  -> I=$(current-estimate)A  Rsh_est=$(shunt-resistor-estimate) Ohm"
-    return shunt-resistor-estimate
-
-  /**
-  $infer-shunt-resistor --loadCurrent: Determine shunt resistor value from known load.
-
-  Useful if you have a DMM clamp or source.  See notes above for similar function.
-  */
-  infer-shunt-resistor --load-current/float -> float:
-    assert: load-current > 0.0
-
-    // Make sure we read one coherent conversion.
-    trigger-single-measurement
-    wait-until-conversion-completed
-    
-    // take some samples and average the shuntVoltage a bit.
-    shunt-voltage-sum/float      := 0.0
-    samples/int                  := 8
-    samples.repeat:
-      shunt-voltage-sum += read-shunt-voltage
-      
-    shunt-voltage/float          := shunt-voltage-sum / samples.to-float
-    shunt-resistor-estimate/float := shunt-voltage / load-current
-    logger_.debug "infer-shunt-resistor: Vsh=$(shunt-voltage)V  I_known=$(load-current)A  -> Rsh_est=$(shunt-resistor-estimate)Ω"
-    return shunt-resistor-estimate
 
   /** 
   $print-diagnostics: Print Diagnostic Information.

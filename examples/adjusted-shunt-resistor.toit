@@ -45,8 +45,8 @@ main:
   ina226-device := bus.device Ina226.I2C_ADDRESS
   ina226-driver := Ina226 ina226-device
 
-  ina226-driver.set-shunt-resistor --resistor=0.010                  // Reconfigure to the new 0.010 Ohm resistor
-  ina226-driver.set-measure-mode --mode=Ina226.MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
+  ina226-driver.set-shunt-resistor 0.010                      // Reconfigure to the new 0.010 Ohm resistor
+  ina226-driver.set-measure-mode Ina226.MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
   
   // Continuously read and display values, in one row:
   10.repeat:

@@ -30,15 +30,15 @@ main:
   ina226-driver := Ina226 ina226-device
 
   // Set sample size to 1 to help show variation in voltage is noticable
-  ina226-driver.set-sampling-rate --rate=Ina226.AVERAGE-1-SAMPLE
-  ina226-driver.set-conversion-time --bus=Ina226.TIMING-204-US
-  ina226-driver.set-conversion-time --shunt=Ina226.TIMING-204-US
-  ina226-driver.set-shunt-resistor --resistor=0.100
+  ina226-driver.set-sampling-rate Ina226.AVERAGE-1-SAMPLE
+  ina226-driver.set-bus-conversion-time Ina226.TIMING-204-US
+  ina226-driver.set-shunt-conversion-time Ina226.TIMING-204-US
+  ina226-driver.set-shunt-resistor 0.100
   
   // Read and display values every minute, but turn the device off in between
   10.repeat:
     // Three CONTINUOUS measurements, fluctuation expected
-    ina226-driver.set-measure-mode --mode=Ina226.MODE-CONTINUOUS
+    ina226-driver.set-measure-mode Ina226.MODE-CONTINUOUS
     ina226-driver.set-power-on
     print "Three CONTINUOUS measurements, fluctuation usually expected"
     3.repeat:
@@ -46,7 +46,7 @@ main:
       sleep --ms=500
     
     // CHANGE MODE - trigger a measurement and switch off
-    ina226-driver.set-measure-mode --mode=Ina226.MODE-TRIGGERED
+    ina226-driver.set-measure-mode Ina226.MODE-TRIGGERED
 
     3.repeat:
       ina226-driver.set-power-on
