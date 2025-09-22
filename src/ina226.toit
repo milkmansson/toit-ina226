@@ -155,8 +155,8 @@ class Ina226:
     reg_ = dev.registers
 
     if (read-device-identification != INA226-DEVICE-ID_): 
-      logger_.info "Device is NOT an INA226 (0x$(%04x INA226-DEVICE-ID_) [Device ID:0x$(%04x read-device-identification)]) "
-      logger_.info "Device is man-id=0x$(%04x read-manufacturer-id) dev-id=0x$(%04x read-device-identification) rev=0x$(%04x read-device-revision)"
+      logger_.error "Device is NOT an INA226 (0x$(%04x INA226-DEVICE-ID_) [Device ID:0x$(%04x read-device-identification)]) "
+      logger_.error "Device is man-id=0x$(%04x read-manufacturer-id) dev-id=0x$(%04x read-device-identification) rev=0x$(%04x read-device-revision)"
       throw "Device is not an INA226."
 
     initialize-device_
@@ -201,7 +201,7 @@ class Ina226:
     reg_.write-u16-be REGISTER-CONFIG_ new-value
     sleep --ms=(get-estimated-conversion-time-ms)
     after-value := reg_.read-u16-be REGISTER-CONFIG_
-    //logger_.info "reset_: 0x$(%04x old-value) [to 0x$(%04x new-value)] - after reset 0x$(%04x after-value)"
+    //logger_.debug "reset_: 0x$(%04x old-value) [to 0x$(%04x new-value)] - after reset 0x$(%04x after-value)"
 
   /** 
   $get-calibration-value: Gets current calibration value.
