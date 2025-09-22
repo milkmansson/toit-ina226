@@ -18,7 +18,7 @@ Mode constants to be used by users during configuration with $Ina226.set-measure
 */
 INA226-MODE-POWER-DOWN                          ::= 0x00
 INA226-MODE-TRIGGERED                           ::= 0x03
-INA226-MODE-CONTINUOUS                          ::= 0x07
+INA226-MODE-CONTINUOUS                          ::= 0x07 // Class Default.
 
 /**
 Alert Types that can set off the alert register and/or alert pin. See $Ina226.set-alert
@@ -35,7 +35,7 @@ INA226-ALERT-CONVERSION-READY                   ::= 0x0400
 /** 
 Sampling options used for measurements. To be used with $Ina226.set-sampling-rate
 */
-INA226-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default
+INA226-AVERAGE-1-SAMPLE                         ::= 0x0000 // Chip Default.
 INA226-AVERAGE-4-SAMPLES                        ::= 0x0001
 INA226-AVERAGE-16-SAMPLES                       ::= 0x0002
 INA226-AVERAGE-64-SAMPLES                       ::= 0x0003
@@ -51,7 +51,7 @@ INA226-TIMING-140-US                            ::= 0x0000
 INA226-TIMING-204-US                            ::= 0x0001
 INA226-TIMING-332-US                            ::= 0x0002
 INA226-TIMING-588-US                            ::= 0x0003
-INA226-TIMING-1100-US                           ::= 0x0004 // Default
+INA226-TIMING-1100-US                           ::= 0x0004 // Chip Default.
 INA226-TIMING-2100-US                           ::= 0x0005
 INA226-TIMING-4200-US                           ::= 0x0006
 INA226-TIMING-8300-US                           ::= 0x0007
@@ -121,7 +121,7 @@ class Ina226:
   static CONVERSION-READY-LENGTH_                 ::= 1
 
   static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
-  static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 0.08192  // volts
+  static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 0.08192  // volts.
 
   // 'Measure Mode' (includes OFF).
   static MODE-POWER-DOWN_                         ::= 0x00
@@ -130,8 +130,8 @@ class Ina226:
 
   static INA226-DEVICE-ID                         ::= 0x0226
 
-  reg_/registers.Registers                        := ?       // set by contructor  
-  logger_/log.Logger                              := ?       // set by contructor
+  reg_/registers.Registers                        := ?       // set by contructor.
+  logger_/log.Logger                              := ?       // set by contructor.
   current-divider-ma_/float                       := 0.0
   power-multiplier-mw_/float                      := 0.0
   last-measure-mode_/int                          := INA226-MODE-CONTINUOUS
@@ -169,11 +169,11 @@ class Ina226:
 
     // Initialise Default sampling, conversion timing, and measuring mode.
     set-sampling-rate --rate=INA226-AVERAGE-1-SAMPLE
-    set-conversion-time --bus=INA226-TIMING-1100-US     // Default
-    set-conversion-time --shunt=INA226-TIMING-1100-US   // Default
+    set-conversion-time --bus=INA226-TIMING-1100-US     // Chip Default.  Shown here for clarity.
+    set-conversion-time --shunt=INA226-TIMING-1100-US   // Chip Default.  Shown here for clarity.
     set-measure-mode --mode=MODE-CONTINUOUS_
 
-    // Set Defaults for Shunt Resistor - module usually ships with R100.
+    // Set Defaults for Shunt Resistor - module usually ships with R100. (0.100 Ohm)
     set-shunt-resistor --resistor=0.100
     
     // Performing a single measurement during initialisation assists with accuracy for first reads.
@@ -213,7 +213,6 @@ class Ina226:
   manually is not normally required.  See Datasheet pp.10.
   */
   set-calibration-value --value/int -> none:
-    //assert: ((value >= 1500) and (value <= 3000))  // sanity check
     old-value := reg_.read-u16-be REGISTER-CALIBRATION_
     reg_.write-u16-be REGISTER-CALIBRATION_ value
     logger_.debug "calibration-value: changed from $(old-value) to $(value)"
@@ -271,7 +270,7 @@ class Ina226:
     new-value     &= ~CONF-BUSVC-MASK_
     new-value     |= (bus << CONF-BUSVC-OFFSET_)
     reg_.write-u16-be REGISTER-CONFIG_ new-value
-    logger_.debug "conversion-time: --bus set from 0x$(%02x old-value) to 0x$(%02x new-value)"
+    logger_.debug "conversion-time: --bus REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
 
   /**
   $set-conversion-time --shunt: Sets conversion-time for shunt only. See 'Conversion Time'.
@@ -282,7 +281,7 @@ class Ina226:
     new-value     &= ~CONF-SHUNTVC-MASK_
     new-value     |= (shunt << CONF-SHUNTVC-OFFSET_)
     reg_.write-u16-be REGISTER-CONFIG_ new-value
-    logger_.debug "conversion-time: --shunt set from 0x$(%02x old-value) to 0x$(%02x new-value)"
+    logger_.debug "conversion-time: --shunt REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
 
   /** 
   $set-measure-mode: Sets Measure Mode. 
@@ -306,9 +305,8 @@ class Ina226:
     old-value/int := reg_.read-u16-be REGISTER-CONFIG_
     new-value/int := old-value
     new-value     &= ~(CONF-MODE-MASK_)
-    new-value     |= mode  //low value, no left shift offset
+    new-value     |= mode                 // low value, no left shift offset.
     reg_.write-u16-be REGISTER-CONFIG_ new-value
-    // logger_.debug "measure-mode set from 0x$(%02x old-value) to 0x$(%02x new-value)"
     if (mode != MODE-POWER-DOWN_): last-measure-mode_ = mode
 
   /**
@@ -332,9 +330,9 @@ class Ina226:
   Resistor value in ohm, Current range in amps.
   */
   set-shunt-resistor --resistor/float --max-current/float -> none:
-    shunt-resistor_        = resistor                                              // Cache to class-wide for later use
-    max-current_           = max-current                                           // Cache to class-wide for later use
-    current-LSB_           = (max-current_ / 32768.0)                              // Amps per bit (LSB)
+    shunt-resistor_        = resistor                                              // Cache to class-wide for later use.
+    max-current_           = max-current                                           // Cache to class-wide for later use.
+    current-LSB_           = (max-current_ / 32768.0)                              // Amps per bit (eg. LSB).
     //logger_.debug "shunt-resistor: current per bit = $(current-LSB_)A"
     new-calibration-value := INTERNAL_SCALING_VALUE_ / (current-LSB_ * resistor)
     //logger_.debug "shunt-resistor: calibration value becomes = $(new-calibration-value) $((new-calibration-value).round)[rounded]"
@@ -409,7 +407,7 @@ class Ina226:
 
   /** busy: Returns true if conversion is still ongoing */
   busy -> bool:
-    value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_                       // clears CNVR (Conversion Ready) Flag
+    value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_              // Reading clears CNVR (Conversion Ready) Flag.
     return ((value & ALERT-CONVERSION-READY-FLAG_) == 0)
 
   /**
@@ -419,7 +417,7 @@ class Ina226:
     max-wait-time-ms/int   := get-estimated-conversion-time-ms
     current-wait-time-ms/int   := 0
     sleep-interval-ms/int := 50
-    while busy:                                                               // checks if sampling is completed
+    while busy:                                                      // Checks if sampling is completed.
       sleep --ms=sleep-interval-ms
       current-wait-time-ms += sleep-interval-ms
       if current-wait-time-ms >= max-wait-time-ms:
@@ -437,9 +435,9 @@ class Ina226:
   $trigger-single-measurement: perform a single conversion - without waiting.
   */
   trigger-single-measurement --nowait -> none:
-    mask-register-value/int   := reg_.read-u16-be REGISTER-MASK-ENABLE_        // clears CNVR (Conversion Ready) Flag
+    mask-register-value/int   := reg_.read-u16-be REGISTER-MASK-ENABLE_        // Reading clears CNVR (Conversion Ready) Flag.
     config-register-value/int   := reg_.read-u16-be REGISTER-CONFIG_     
-    reg_.write-u16-be REGISTER-CONFIG_ config-register-value                   // Starts conversion
+    reg_.write-u16-be REGISTER-CONFIG_ config-register-value                   // Starts conversion.
 
   /** ALERT FUNCTIONS  */
 
@@ -477,8 +475,8 @@ class Ina226:
     // Set Alert Type Flag.
     old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     new-value/int := old-value
-    new-value     &= ~(0xF800)    // clear old alert values (bits D11 to D15) - only one alert allowed at once
-    new-value     |= type         // already bit shifted in the mask constants!
+    new-value     &= ~(0xF800)    // Clear old alert values (bits D11 to D15) - only one alert allowed at once.
+    new-value     |= type         // Already bit shifted in the mask constants!
     reg_.write-u16-be REGISTER-MASK-ENABLE_ new-value
     logger_.debug "set-alert: mask $(bits-16 old-value) to $(bits-16 new-value)"
 
@@ -619,7 +617,7 @@ class Ina226:
     old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     new-value/int := old-value
     new-value     &= ~(CONVERSION-READY-BIT_)
-    new-value     |= (set << CONVERSION-READY-OFFSET_) // already bit shifted
+    new-value     |= (set << CONVERSION-READY-OFFSET_) // Already bit shifted.
     reg_.write-u16-be REGISTER-MASK-ENABLE_ new-value
     logger_.debug "conversion-ready: alert-pin $(set) is $(bits-16 old-value) to $(bits-16 new-value)"
 
@@ -689,11 +687,11 @@ class Ina226:
     // If converting to support bus-only or shunt-only modes, drop the other term.
     totalus/int    := (bus-conversion-time + shunt-conversion-time) * sampling-rate
 
-    // Add a small guard factor (~10%) to be conservative
+    // Add a small guard factor (~10%) to be conservative.
     totalus = ((totalus * 11.0) / 10.0).to-int
 
     // Return milliseconds, minimum 1 ms
-    totalms := ((totalus + 999) / 1000).to-int  // ceil
+    totalms := ((totalus + 999) / 1000).to-int  // Ceiling.
     if totalms < 1: totalms = 1
 
     //logger_.debug "get-estimated-conversion-time-ms is: $(totalms)ms"
@@ -808,7 +806,7 @@ class Ina226:
   attempts to check for the simple case where values indiate it is not tied.
   */
   verify-tied-bus-load -> bool:
-    // Optional: ensure fresh data
+    // Optional: ensure fresh data.
     trigger-single-measurement
     wait-until-conversion-completed
 
@@ -834,14 +832,14 @@ class Ina226:
   check what is measured and compare it.  Also calculates/compares using Ohms Law (V=I*R).
   */
   print-diagnostics -> none:
-    // Optional: ensure fresh data
+    // Optional: ensure fresh data.
     trigger-single-measurement
     wait-until-conversion-completed
 
     shunt-voltage/float                := read-shunt-voltage
-    load-voltage/float                 := read-bus-voltage                   // what the load actually sees (VBUS, eg IN−)
-    supply-voltage/float               := load-voltage + shunt-voltage       // upstream rail (IN+ = IN− + Vsh)
-    shunt-voltage-delta/float          := supply-voltage - load-voltage      // same as vsh
+    load-voltage/float                 := read-bus-voltage                   // what the load actually sees (Vbus, eg IN−).
+    supply-voltage/float               := load-voltage + shunt-voltage       // upstream rail (IN+ = IN− + Vshunt).
+    shunt-voltage-delta/float          := supply-voltage - load-voltage      // same as Vshunt.
     shunt-voltage-delta-percent/float  := 0.0
     if supply-voltage > 0.0: shunt-voltage-delta-percent = (shunt-voltage-delta / supply-voltage) * 100.0
 
@@ -869,7 +867,7 @@ class Ina226:
     print "    Shunt Resistor    =  $(%0.8f shunt-resistor_) Ohm (Configured in code)"
     print "    Vload    (IN-)    =  $(%0.8f load-voltage)  V"
     print "    Vsupply  (IN+)    =  $(%0.8f supply-voltage)  V"
-    print "    Shunt V delta     =  $(%0.8f shunt-voltage-delta)  V"
+    print "    Shunt Voltge delta=  $(%0.8f shunt-voltage-delta)  V"
     print "                      = ($(%0.8f shunt-voltage-delta*1000.0)  mV)"
     print "                      = ($(%0.3f shunt-voltage-delta-percent)% of supply)"
     print "    Vshunt (direct)   =  $(%0.8f shunt-voltage)  V"
