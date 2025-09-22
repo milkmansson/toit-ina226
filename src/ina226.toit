@@ -9,6 +9,22 @@ import binary
 import serial.device as serial
 import serial.registers as registers
 
+/**
+Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/.  There are others with different feature sets and may be partially code compatible.
+- For all sensor reads, values are floats, and supplied in base SI units: volts, amps and watts.
+- get-* and set-* methods/functions are used for setting properties about the class or the sensor itself.
+- read-* methods/functions are used for getting reading actual sensor values 
+
+To use this library, first consult the examples.  Several values need setting before data will be available.  These are set using the class to default values to allow for immediate use.  
+- If the shunt resistor is not R100 (0.100 Ohm) ensure to set this directly after intantiation.  See the examples.
+- Ensure sample size is set appropriately - a higher sample size will ensure more stable measurements.
+
+Examples in the `examples` folder:
+- Use Case 1: Simple Continuous Measurement.
+- Use Case 2: Adjusting the Shunt Resistor to measure (for example, smaller) currents.
+- Use Case 3: Triggered Updates - low power mode for infrequent/intermittent updates.
+*/
+
 // $DEFAULT-I2C-ADDRESS is 64 (0x40) with jumper defaults.
 // Valid address values: 64 to 79 - See datasheet table 6-2
 DEFAULT-I2C-ADDRESS                      ::= 0x40
@@ -55,22 +71,6 @@ INA226-TIMING-1100-US                           ::= 0x0004 // Chip Default.
 INA226-TIMING-2100-US                           ::= 0x0005
 INA226-TIMING-4200-US                           ::= 0x0006
 INA226-TIMING-8300-US                           ::= 0x0007
-
-/**
-Toit Driver Library for an INA226 module, DC Shunt current and power sensor.  Several common modules exist based on the TI INA226 chip, atasheet: https://www.ti.com/lit/ds/symlink/ina226.pdf  One example: https://esphome.io/components/sensor/ina226/.  There are others with different feature sets and may be partially code compatible.
-- For all sensor reads, values are floats, and supplied in base SI units: volts, amps and watts.
-- get-* and set-* methods/functions are used for setting properties about the class or the sensor itself.
-- read-* methods/functions are used for getting reading actual sensor values 
-
-To use this library, first consult the examples.  Several values need setting before data will be available.  These are set using the class to default values to allow for immediate use.  
-- If the shunt resistor is not R100 (0.100 Ohm) ensure to set this directly after intantiation.  See the examples.
-- Ensure sample size is set appropriately - a higher sample size will ensure more stable measurements.
-
-Examples in the `examples` folder:
-- Use Case 1: Simple Continuous Measurement.
-- Use Case 2: Adjusting the Shunt Resistor to measure (for example, smaller) currents.
-- Use Case 3: Triggered Updates - low power mode for infrequent/intermittent updates.
-*/
 
 class Ina226:
   // Core Register Addresses.
