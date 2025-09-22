@@ -1,7 +1,7 @@
 
 // Copyright (C) 2025 Toit Contributors
 // Use of this source code is governed by an MIT-style license that can be
-// found in the package's LICENSE file.   This also file includes derivative 
+// found in the package's LICENSE file.   This file also includes derivative 
 // work from other authors and sources.  See accompanying documentation.
 
 import log
@@ -20,9 +20,9 @@ feature sets and may be partially code compatible.
 - get-* and set-* methods/functions are used for setting properties about the class or the sensor itself.
 - read-* methods/functions are used for getting reading actual sensor values 
 
-To use this library, first consult the examples.  Several values need setting before data will
+To use this library, first consult the examples.  Several values must be set before data will
 be available.  These are set using the class to default values to allow for immediate use.  
-- Most variants I have personally seeen have an R100 shunt resistor.  If the shunt resistor is
+- Most variants I have personally seen have an R100 shunt resistor.  If the shunt resistor is
   not R100 (0.100 Ohm) ensure to set this in the class after intantiation.  (See the examples!)
 - Ensure sample size is set appropriately - a higher sample size will ensure more stable 
   measurements, although changes will be slower to be visible.
@@ -89,11 +89,11 @@ class Ina226:
   static REGISTER-CONFIG_                ::= 0x00  //RW  // All-register reset, shunt voltage and bus voltage ADC conversion times and averaging, operating mode.
   static REGISTER-SHUNT-VOLTAGE_         ::= 0x01  //R   // Shunt voltage measurement data.
   static REGISTER-BUS-VOLTAGE_           ::= 0x02  //R   // Bus voltage measurement data.
-  static REGISTER-LOAD-POWER_            ::= 0x03  //R   // value of the calculated power being delivered to the load.
-  static REGISTER-SHUNT-CURRENT_         ::= 0x04  //R   // value of the calculated current flowing through the shunt resistor.
+  static REGISTER-LOAD-POWER_            ::= 0x03  //R   // Value of the calculated power being delivered to the load.
+  static REGISTER-SHUNT-CURRENT_         ::= 0x04  //R   // Value of the calculated current flowing through the shunt resistor.
   static REGISTER-CALIBRATION_           ::= 0x05  //RW  // Sets full-scale range and LSB of current and power measurements. Overall system calibration.
   static REGISTER-MASK-ENABLE_           ::= 0x06  //RW  // Alert configuration and Conversion Ready flag.
-  static REGISTER-ALERT-LIMIT_           ::= 0x07  //RW  // limit value to compare to the selected Alert function.
+  static REGISTER-ALERT-LIMIT_           ::= 0x07  //RW  // Limit value to compare to the selected Alert function.
   static REGISTER-MANUF-ID_              ::= 0xFE  //R   // Contains unique manufacturer identification number.
   static REGISTER-DIE-ID_                ::= 0xFF  //R   // Contains unique die identification number.
 
@@ -116,37 +116,37 @@ class Ina226:
   static CONF-MODE-OFFSET_               ::= 0
 
   //  Get Alert Flag.
-  static ALERT-CONVERSION-READY-FLAG_             ::= 0x0008
-  static ALERT-CONVERSION-READY-OFFSET_           ::= 3
-  static ALERT-CONVERSION-READY-LENGTH_           ::= 1
-  static ALERT-FUNCTION-FLAG_                     ::= 0x0010
-  static ALERT-FUNCTION-OFFSET_                   ::= 4
-  static ALERT-FUNCTION-LENGTH_                   ::= 1
-  static ALERT-MATH-OVERFLOW-FLAG_                ::= 0x0004
-  static ALERT-MATH-OVERFLOW-OFFSET_              ::= 2
-  static ALERT-MATH-OVERFLOW-LENGTH_              ::= 1
-  static ALERT-PIN-POLARITY-BIT_                  ::= 0x0002
-  static ALERT-PIN-POLARITY-OFFSET_               ::= 1
-  static ALERT-PIN-POLARITY-LENGTH_               ::= 1
-  static ALERT-LATCH-ENABLE-BIT_                  ::= 0x0001
-  static ALERT-LATCH-ENABLE-OFFSET_               ::= 0
-  static ALERT-LATCH-ENABLE-LENGTH_               ::= 1
-  static CONVERSION-READY-BIT_                    ::= 0x0800
-  static CONVERSION-READY-OFFSET_                 ::= 10
-  static CONVERSION-READY-LENGTH_                 ::= 1
+  static ALERT-CONVERSION-READY-FLAG_    ::= 0x0008
+  static ALERT-CONVERSION-READY-OFFSET_  ::= 3
+  static ALERT-CONVERSION-READY-LENGTH_  ::= 1
+  static ALERT-FUNCTION-FLAG_            ::= 0x0010
+  static ALERT-FUNCTION-OFFSET_          ::= 4
+  static ALERT-FUNCTION-LENGTH_          ::= 1
+  static ALERT-MATH-OVERFLOW-FLAG_       ::= 0x0004
+  static ALERT-MATH-OVERFLOW-OFFSET_     ::= 2
+  static ALERT-MATH-OVERFLOW-LENGTH_     ::= 1
+  static ALERT-PIN-POLARITY-BIT_         ::= 0x0002
+  static ALERT-PIN-POLARITY-OFFSET_      ::= 1
+  static ALERT-PIN-POLARITY-LENGTH_      ::= 1
+  static ALERT-LATCH-ENABLE-BIT_         ::= 0x0001
+  static ALERT-LATCH-ENABLE-OFFSET_      ::= 0
+  static ALERT-LATCH-ENABLE-LENGTH_      ::= 1
+  static CONVERSION-READY-BIT_           ::= 0x0800
+  static CONVERSION-READY-OFFSET_        ::= 11
+  static CONVERSION-READY-LENGTH_        ::= 1
 
   static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
   static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 0.08192  // volts.
 
-  reg_/registers.Registers                        := ?       // set by contructor.
-  logger_/log.Logger                              := ?       // set by contructor.
-  current-divider-ma_/float                       := 0.0
-  power-multiplier-mw_/float                      := 0.0
-  last-measure-mode_/int                          := MODE-CONTINUOUS
-  current-LSB_/float                              := 0.0
-  shunt-resistor_/float                           := 0.0
-  current-range_/float                            := 0.0
-  max-current_/float                              := 0.0
+  reg_/registers.Registers               := ?       // set by contsructor.
+  logger_/log.Logger                     := ?       // set by contsructor.
+  current-divider-ma_/float              := 0.0
+  power-multiplier-mw_/float             := 0.0
+  last-measure-mode_/int                 := MODE-CONTINUOUS
+  current-LSB_/float                     := 0.0
+  shunt-resistor_/float                  := 0.0
+  current-range_/float                   := 0.0
+  max-current_/float                     := 0.0
   
   constructor dev/serial.Device --logger/log.Logger=(log.default.with-name "ina226"):
     logger_ = logger
@@ -199,7 +199,7 @@ class Ina226:
     reg_.write-u16-be REGISTER-CONFIG_ new-value
     sleep --ms=(get-estimated-conversion-time-ms)
     after-value := reg_.read-u16-be REGISTER-CONFIG_
-    logger_.info "reset_: 0x$(%02x old-value) [to 0x$(%02x new-value)] - after reset 0x$(%02x after-value)"
+    logger_.info "reset_: 0x$(%04x old-value) [to 0x$(%04x new-value)] - after reset 0x$(%04x after-value)"
 
   /** 
   $get-calibration-value: Gets current calibration value.
@@ -352,7 +352,8 @@ class Ina226:
   /**
   $set-shunt-resistor --resistor: 
   
-  Set shunt resistor value manually, assuming maximum current. Resistor value in Ohms.  
+  Set shunt resistor value manually, assuming maximum current. Resistor value input is in Ohms.
+  The max current is computed from +/-81.92 mV full scale.
   */
   set-shunt-resistor --resistor/float -> none:
     // Current range - max measurable current given the shunt resistor
@@ -413,7 +414,14 @@ class Ina226:
 
   // INITIATING READS AND CONFIGURATIONS
 
-  /** busy: Returns true if conversion is still ongoing */
+  /** 
+  $busy: Returns true if conversion is still ongoing 
+  
+  Register MASK-ENABLE is read each poll.  In practices it does return the pre-clear CNVR
+  bit, but reading also clears it. Loops using `while busy` will work (eg. false when 
+  flag is 1), but it does mean a single poll will consume the flag. (This is already compensated
+  for with the loop in 'wait-until-' functions'.)
+  */
   busy -> bool:
     value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_              // Reading clears CNVR (Conversion Ready) Flag.
     return ((value & ALERT-CONVERSION-READY-FLAG_) == 0)
@@ -456,24 +464,26 @@ class Ina226:
   significant bit position Alert Function (D15-D11) takes priority and responds to the Alert
   Limit Register.  ie. only one alert of one type can be configured simultaneously.  Whatever
   is in the alert value (register) at that time, is then the alert trigger value.
+
+  Limits must be supplied in base SI units (volts, amps and watts) only.
   */
   set-alert --type/int --limit/float -> none:
     alert-limit/float := 0.0
 
-    if type == ALERT-SHUNT-OVER-VOLTAGE:
-      alert-limit = limit * 400          
-    else if type == ALERT-SHUNT-UNDER-VOLTAGE:
-      alert-limit = limit * 400
+    if type == ALERT-SHUNT-OVER-VOLTAGE:             // Alert limit in VOLTS.
+      alert-limit = limit * 400000.0          
+    else if type == ALERT-SHUNT-UNDER-VOLTAGE:       // Alert limit in VOLTS.
+      alert-limit = limit * 400000.0
     else if type == ALERT-CURRENT-OVER:
       type = ALERT-SHUNT-OVER-VOLTAGE
-      alert-limit = limit * 2048 * current-divider-ma_ / (get-calibration-value).to-float
+      alert-limit = limit * shunt-resistor_ * 400000.0
     else if type == ALERT-CURRENT-UNDER:
       type = ALERT-SHUNT-UNDER-VOLTAGE
-      alert-limit = limit * 2048 * current-divider-ma_ / (get-calibration-value).to-float
-    else if type == ALERT-BUS-OVER-VOLTAGE:
-      alert-limit = limit * 800
-    else if type == ALERT-BUS-UNDER-VOLTAGE:
-      alert-limit = limit * 800
+      alert-limit = limit * shunt-resistor_ * 400000.0
+    else if type == ALERT-BUS-OVER-VOLTAGE:          // limit is in volts (1.25 mV / LSB ⇒ 800 counts per volt)
+      alert-limit = limit * 800.0
+    else if type == ALERT-BUS-UNDER-VOLTAGE:         // limit is in volts (1.25 mV / LSB ⇒ 800 counts per volt)
+      alert-limit = limit * 800.0
     else if type == ALERT-POWER-OVER:
       alert-limit = limit / power-multiplier-mw_
     else:
@@ -673,10 +683,10 @@ class Ina226:
 
 
   /** 
-  $get-estimated-conversion-time-ms: estimate a maximum waiting time based on the configuration.
+  $get-estimated-conversion-time-ms: estimate a worst-case maximum waiting time based on the configuration.
   
   Done this way to prevent setting a global maxWait type value, to then have it fail based
-  on times that are longer due to timing configurations.
+  on times that are longer due to timing configurations.  Calculation also includes a 10% guard.
   */
   get-estimated-conversion-time-ms -> int:
     // Read config and decode fields using masks/offsets
@@ -687,9 +697,9 @@ class Ina226:
     shunt-conversion-time-code/int    := (config-reg-value & CONF-SHUNTVC-MASK_)  >> CONF-SHUNTVC-OFFSET_
     mode/int                          := (config-reg-value & CONF-MODE-MASK_)     >> CONF-MODE-OFFSET_
 
-    sampling-rate/int                 := get-sampling-rate-from-enum --code = samples-code
-    bus-conversion-time/int           := get-conversion-time-us-from-enum --code = bus-conversion-time-code
-    shunt-conversion-time/int         := get-conversion-time-us-from-enum --code = shunt-conversion-time-code
+    sampling-rate/int                 := get-sampling-rate-from-enum --code=samples-code
+    bus-conversion-time/int           := get-conversion-time-us-from-enum --code=bus-conversion-time-code
+    shunt-conversion-time/int         := get-conversion-time-us-from-enum --code=shunt-conversion-time-code
 
     // Mode 0x7 = bus+shunt continuous, 0x3 = bus+shunt triggered (single-shot).
     // If converting to support bus-only or shunt-only modes, drop the other term.
@@ -805,34 +815,6 @@ class Ina226:
     logger_.debug "infer-shunt-resistor: Vsh=$(shunt-voltage)V  I_known=$(load-current)A  -> Rsh_est=$(shunt-resistor-estimate)Ω"
     return shunt-resistor-estimate
 
-
-  /**
-  $verify-tied-bus-load: Determine VBUS and VLOAD are different.
-  
-  Evaluates if the bus and load voltages are different (eg not tied). Useful for diagnostic 
-  functions only.  If the voltages are the same, it is not proof that they are tied, this 
-  attempts to check for the simple case where values indiate it is not tied.
-  */
-  verify-tied-bus-load -> bool:
-    // Optional: ensure fresh data.
-    trigger-single-measurement
-    wait-until-conversion-completed
-
-    bus-voltage/float := read-bus-voltage
-    shunt-voltage/float := read-shunt-voltage
-    bus-load-delta/float := (bus-voltage - shunt-voltage).abs
-  
-    logger_.debug "verify-tied-bus-load: Bus = $(%0.8f bus-voltage)V, Shunt = $(%0.8f shunt-voltage)V, Delta = $(%0.8f bus-load-delta)V"
-    if bus-load-delta < 0.01:       // <10 mV difference
-      logger_.debug "verify-tied-bus-load: Bus and load values appear the same (tied?)     Delta=$(%0.8f bus-load-delta)V"
-      return true
-    else if bus-load-delta < 0.05:  // 10–50 mV: maybe wiring drop
-      logger_.debug "verify-tied-bus-load: Bus/load differ slightly (check traces/wiring)  Delta=$(%0.8f bus-load-delta)V"
-      return false
-    else:
-      logger_.debug "verify-tied-bus-load: Bus and load differ significantly (not tied)    Delta=$(%0.8f bus-load-delta)V"
-      return false
-
   /** 
   $print-diagnostics: Print Diagnostic Information.
   
@@ -872,19 +854,19 @@ class Ina226:
 
     print "DIAG :"
     print "    ----------------------------------------------------------"
-    print "    Shunt Resistor    =  $(%0.8f shunt-resistor_) Ohm (Configured in code)"
-    print "    Vload    (IN-)    =  $(%0.8f load-voltage)  V"
-    print "    Vsupply  (IN+)    =  $(%0.8f supply-voltage)  V"
-    print "    Shunt Voltge delta=  $(%0.8f shunt-voltage-delta)  V"
-    print "                      = ($(%0.8f shunt-voltage-delta*1000.0)  mV)"
-    print "                      = ($(%0.3f shunt-voltage-delta-percent)% of supply)"
-    print "    Vshunt (direct)   =  $(%0.8f shunt-voltage)  V"
+    print "    Shunt Resistor      =  $(%0.8f shunt-resistor_) Ohm (Configured in code)"
+    print "    Vload    (IN-)      =  $(%0.8f load-voltage)  V"
+    print "    Vsupply  (IN+)      =  $(%0.8f supply-voltage)  V"
+    print "    Shunt Voltage delta =  $(%0.8f shunt-voltage-delta)  V"
+    print "                        = ($(%0.8f shunt-voltage-delta*1000.0)  mV)"
+    print "                        = ($(%0.3f shunt-voltage-delta-percent)% of supply)"
+    print "    Vshunt (direct)     =  $(%0.8f shunt-voltage)  V"
     print "    ----------------------------------------------------------"
-    print "    Calibration Value =  $(calibration-value)"
-    print "    I (raw register)  = ($(current-raw))"
-    print "                 LSB  = ($(%0.8f least-significant-bit)  A/LSB)"
-    print "    I (from module)   =  $(%0.8f current-chip)  A"
-    print "    I (from V/R)      =  $(%0.8f current-v-r)  A"
+    print "    Calibration Value   =  $(calibration-value)"
+    print "    I (raw register)    = ($(current-raw))"
+    print "                 LSB    = ($(%0.8f least-significant-bit)  A/LSB)"
+    print "    I (from module)     =  $(%0.8f current-chip)  A"
+    print "    I (from V/R)        =  $(%0.8f current-v-r)  A"
     print "    ----------------------------------------------------------"
     if current-difference-percent < 5.0:
       print "    Check Current       : OK - Currents agree ($(%0.3f current-difference-percent)% under/within 5%)"
