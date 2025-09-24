@@ -50,7 +50,7 @@ main:
 
     3.repeat:
       ina226-driver.set-power-on
-      ina226-driver.trigger-single-measurement
+      ina226-driver.trigger-measurement
       ina226-driver.set-power-off
       event = it
       print " TRIGGER EVENT #$(%02d event) - Registers read 3 times (new values, but no change between reads)"

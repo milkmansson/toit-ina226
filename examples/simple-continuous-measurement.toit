@@ -28,8 +28,8 @@ main:
   ina226-device := bus.device Ina226.I2C_ADDRESS
   ina226-driver := Ina226 ina226-device
 
-  ina226-driver.set-measure-mode --mode=Ina226.MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
-  ina226-driver.trigger-single-measurement                               // Wait for first registers to be ready (eg enough samples)
+  ina226-driver.set-measure-mode Ina226.MODE-CONTINUOUS       // Is the default, but setting again in case of consecutive tests without reset
+  ina226-driver.trigger-measurement                           // Wait for first registers to be ready (eg enough samples)
   
   // Continuously read and display values
   10.repeat:

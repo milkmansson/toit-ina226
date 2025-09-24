@@ -192,7 +192,7 @@ class Ina226:
     set-shunt-resistor 0.100
     
     // Performing a single measurement during initialisation assists with accuracy for first reads.
-    trigger-single-measurement
+    trigger-measurement
     wait-until-conversion-completed
 
   /**
@@ -419,20 +419,17 @@ class Ina226:
         logger_.debug "wait-until-conversion-completed: maxWaitTime $(max-wait-time-ms)ms exceeded - breaking"
         break
 
-  /**
-  $trigger-single-measurement: initiate a single measurement without waiting for completion.
-  */
-  trigger-single-measurement -> none:
-    trigger-single-measurement --nowait
-    wait-until-conversion-completed
-  
   /** 
-  $trigger-single-measurement: perform a single conversion - without waiting.
+  $trigger-measurement: perform a single conversion - without waiting.
+  
+  TRIGGERED MODE:  Executes one measurement
+  CONTINUOUS MODE: Refreshes data
   */
-  trigger-single-measurement --nowait -> none:
+  trigger-measurement --wait/bool=true -> none:
     mask-register-value/int   := reg_.read-u16-be REGISTER-MASK-ENABLE_        // Reading clears CNVR (Conversion Ready) Flag.
     config-register-value/int   := reg_.read-u16-be REGISTER-CONFIG_     
     reg_.write-u16-be REGISTER-CONFIG_ config-register-value                   // Starts conversion.
+    if wait: wait-until-conversion-completed
 
   /** 
   $set-alert: configures the various alert types.
@@ -738,7 +735,7 @@ class Ina226:
   */
   print-diagnostics -> none:
     // Optional: ensure fresh data.
-    trigger-single-measurement
+    trigger-measurement
     wait-until-conversion-completed
 
     shunt-voltage/float                := read-shunt-voltage
