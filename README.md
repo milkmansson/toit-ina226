@@ -5,12 +5,14 @@ Toit Driver Library for an INA226 module, DC Shunt Current, Voltage, and Power M
 The INA226 from Texas Instruments is a precision digital power monitor with an integrated 16-bit ADC.  It measures the voltage drop across a shunt resistor to calculate current, monitors the bus voltage directly, and internally multiplies the two to report power consumption.
 
 Core features:
-- Measures shunt voltage (±81.92 mV) with 2.5 µV resolution.
+- Measures shunt voltage (±81.92 mV) with 2.5 uV resolution.
 - Measures bus voltage (0 – 36 V) with 1.25 mV resolution.
-- Computes current and power using a user-programmable shunt resistor value and calibration register.
-- Independent conversion times for bus and shunt channels (140 µs – 8.3 ms).
+- Shunt voltage: 2.5 uV/LSB, full-scale ±81.92 mV. 
+- Bus voltage: 1.25 mV/LSB, full-scale code = 40.96 V (but input must be ≤36 V). 
+- Computes current and power using a user-programmable shunt resistor value and calibration register (Current and Power are 0 until this is set.)
+- Independent conversion times for bus and shunt channels (140 us – 8.3 ms).
 - Programmable averaging (1 – 1024 samples) for noise reduction.
-- I²C interface (up to 3.4 MHz) for easy integration.
+- I²C interface - Fast (≤400 kHz) and High-Speed mode up to 2.94 MHz
 - Built-in alert system for over/under-voltage, over-current, over-power, and conversion ready.
 - Operates from a single 2.7 – 5.5 V supply.
 
@@ -31,6 +33,7 @@ This library begun as a port of work originally done by Wolfgang Ewald <WEwald@g
 - Calculation of values for timeouts (instead of the 'max-wait' hard coded values)
 - Using of overloads to help make the code simpler for each feature required
 - Extra aliases for reads to help unfamiliar users get started with this
+
 
 # Usage
 Start with the [Quick Start] or start with the core concepts.
@@ -60,7 +63,7 @@ In continuous mode, the INA226 loops forever:
 - It repeatedly measures bus voltage and shunt voltage.
 - Each conversion result overwrites the previous one in the registers.
 - The sampling cadence is set by your conversion times + averaging settings.
-- Typical current draw is ~420 µA. 
+- Typical current draw is 330uA typical, 420 uA max.
 
 Use cases:
 - Requiring a live stream of current/voltage/power, e.g. logging consumption of an IoT node over hours.
@@ -72,7 +75,7 @@ In triggered (single-shot) mode:
 - The INA226 sits idle until a measurement is explicitly triggered (by writing to the config register).
 - It performs exactly one set of conversions (bus + shunt, with averaging if configured).
 - Then it goes back to idle (low power).
-- Each conversion uses ~330 µA during its active time (typically a few milliseconds).
+- Each conversion uses ~330 uA during its active time (typically a few milliseconds).
 
 Use cases:
 - Low power consumption: e.g. wake up the INA226 once every few seconds/minutes, take a measurement, then let both the INA226 and MCU sleep.
@@ -80,7 +83,7 @@ Use cases:
 - Useful in battery-powered applications where quiescent drain must be minimized.
 
 ##### Power-Down Mode
-INA226 enters ultra-low-power state. No measurements happen. Supply current drops to ~0.1 µA (negligible). Useful for ultra-low power systems where periodic measurement isn't needed.
+INA226 enters ultra-low-power state. No measurements happen. Supply current drops to 0.5 uA typ (2uA max). Useful for ultra-low power systems where periodic measurement isn't needed.
 
 #### Conversion Time
 The INA226 has an ADC (Analog-to-Digital Converter) inside.
@@ -110,9 +113,9 @@ The INA226 measures two things natively:
 From these, the driver computes current and power, and reconstructs the upstream supply.  Typical wiring on breakout boards: VBUS is internally tied to IN− (the low side of the shunt).  If your hardware is different (VBUS not tied to IN−), the meanings below still hold, but “bus voltage” is whatever is wired to VBUS. Most users only connect IN+ and IN−, which is sufficient for the readings shown.
 
 Units and scaling:
-- read-shunt-voltage:     volts (V).    LSB ≈ 2.5 µV internally.
+- read-shunt-voltage:     volts (V).    LSB ≈ 2.5 uV internally.
 - read-bus-voltage:       volts (V).    LSB ≈ 1.25 mV internally.
-- read-shunt-current:     amps (A).     Derived from Vshunt and configured shunt resistor.
+- read-shunt-current:     amps (A).     Derived from Vshunt and configured shunt resistor (calibration)
 - read-load-power:        watts (W).    Derived internally by the chip from current*25*LSB.
 - read-supply-voltage:    volts (V).    Reconstructed as Vbus + Vshunt.
 

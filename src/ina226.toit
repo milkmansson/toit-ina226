@@ -45,9 +45,9 @@ class Ina226:
   /** 
   MODE constants to be used by users during configuration with $set-measure-mode
   */
-  static MODE-POWER-DOWN                 ::= 0x00
-  static MODE-TRIGGERED                  ::= 0x03
-  static MODE-CONTINUOUS                 ::= 0x07 // Class Default.
+  static MODE-POWER-DOWN                 ::= 0b000
+  static MODE-TRIGGERED                  ::= 0b011
+  static MODE-CONTINUOUS                 ::= 0b111 // Class Default.
 
   /**
   Alert Types that can set off the alert register and/or alert pin. See $set-alert
@@ -64,14 +64,14 @@ class Ina226:
   /** 
   Sampling options used for measurements. To be used with $set-sampling-rate
   */
-  static AVERAGE-1-SAMPLE                ::= 0x0000 // Chip Default.
-  static AVERAGE-4-SAMPLES               ::= 0x0001
-  static AVERAGE-16-SAMPLES              ::= 0x0002
-  static AVERAGE-64-SAMPLES              ::= 0x0003
-  static AVERAGE-128-SAMPLES             ::= 0x0004
-  static AVERAGE-256-SAMPLES             ::= 0x0005
-  static AVERAGE-512-SAMPLES             ::= 0x0006
-  static AVERAGE-1024-SAMPLES            ::= 0x0007
+  static AVERAGE-1-SAMPLE                       ::= 0x00  // Chip Default - Values averaged over 1 sample.
+  static AVERAGE-4-SAMPLES                      ::= 0x01  // Values averaged over 4 samples.
+  static AVERAGE-16-SAMPLES                     ::= 0x02  // Values averaged over 16 samples.
+  static AVERAGE-64-SAMPLES                     ::= 0x03  // Values averaged over 64 samples.
+  static AVERAGE-128-SAMPLES                    ::= 0x04  // Values averaged over 128 samples.
+  static AVERAGE-256-SAMPLES                    ::= 0x05  // Values averaged over 256 samples.
+  static AVERAGE-512-SAMPLES                    ::= 0x06  // Values averaged over 512 samples.
+  static AVERAGE-1024-SAMPLES                   ::= 0x07  // Values averaged over 1024 samples.
 
   /** 
   Bus and Shunt conversion timing options. 
@@ -99,21 +99,24 @@ class Ina226:
   static REGISTER-MANUF-ID_              ::= 0xFE  //R   // Contains unique manufacturer identification number.
   static REGISTER-DIE-ID_                ::= 0xFF  //R   // Contains unique die identification number.
 
-  // Die & Manufacturer Info Masks. (Masking REGISTER-DIE-ID_ register.)
-  static DIE-ID-RID-MASK_                ::= 0x000F // Masks its part of the REGISTER-DIE-ID Register.
-  static DIE-ID-DID-MASK_                ::= 0xFFF0 // Masks its part of the REGISTER-DIE-ID Register.
+  // Die & Manufacturer Info Masks
+  static DIE-ID-RID-MASK_                       ::= 0x000F //R  // Masks its part of the REGISTER-DIE-ID Register
+  static DIE-ID-RID-OFFSET_                     ::= 0
+  static DIE-ID-DID-MASK_                       ::= 0xFFF0 //R  // Masks its part of the REGISTER-DIE-ID Register
+  static DIE-ID-DID-OFFSET_                     ::= 4
 
   // Actual INA226 device ID - to identify this chip over INA3221 etc.
   static INA226-DEVICE-ID_               ::= 0x0226
 
   // Configuration Register bitmasks.
   static CONF-RESET-MASK_                ::= 0x8000
+  static CONF-RESET-OFFSET_              ::= 15
   static CONF-AVERAGE-MASK_              ::= 0x0E00
   static CONF-AVERAGE-OFFSET_            ::= 9
-  static CONF-BUSVC-MASK_                ::= 0x01C0
-  static CONF-BUSVC-OFFSET_              ::= 6
   static CONF-SHUNTVC-MASK_              ::= 0x0038
   static CONF-SHUNTVC-OFFSET_            ::= 3
+  static CONF-BUSVC-MASK_                ::= 0x01C0
+  static CONF-BUSVC-OFFSET_              ::= 6
   static CONF-MODE-MASK_                 ::= 0x0007
   static CONF-MODE-OFFSET_               ::= 0
 
@@ -137,8 +140,10 @@ class Ina226:
   static CONVERSION-READY-OFFSET_        ::= 11
   static CONVERSION-READY-LENGTH_        ::= 1
 
-  static INTERNAL_SCALING_VALUE_/float            ::= 0.00512
-  static ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/float ::= 0.08192  // volts.
+  static INTERNAL_SCALING_VALUE_/float         ::= 0.00512
+  static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.08192    // volts.
+  static SHUNT-VOLTAGE-LSB_                    ::= 0.0000025  // volts. 2.5 µV/bit.
+  static BUS-VOLTAGE-LSB_                      ::= 0.00125    // volts, 1.25 mV/bit
 
   reg_/registers.Registers               := ?       // set by contsructor.
   logger_/log.Logger                     := ?       // set by contsructor.
@@ -190,18 +195,13 @@ class Ina226:
     trigger-single-measurement
     wait-until-conversion-completed
 
-  /** 
+  /**
   $reset_: Reset Device.
   
   Setting bit 16 resets the device.  Once directly set, the bit self-clears afterwards.
   */
   reset_ -> none:
-    old-value := reg_.read-u16-be REGISTER-CONFIG_
-    new-value := old-value | CONF-RESET-MASK_
-    reg_.write-u16-be REGISTER-CONFIG_ new-value
-    sleep --ms=(get-estimated-conversion-time-ms)
-    after-value := reg_.read-u16-be REGISTER-CONFIG_
-    //logger_.debug "reset_: 0x$(%04x old-value) [to 0x$(%04x new-value)] - after reset 0x$(%04x after-value)"
+    write-register_ --register=REGISTER-CONFIG_ --mask=CONF-RESET-MASK_ --offset=CONF-RESET-OFFSET_ --value=0b1
 
   /** 
   $get-calibration-value: Gets current calibration value.
@@ -212,7 +212,8 @@ class Ina226:
   method - setting manually is not normally required.  See Datasheet pp.10.
   */
   get-calibration-value -> int:
-    return reg_.read-u16-be REGISTER-CALIBRATION_
+    return read-register_ --register=REGISTER-CALIBRATION_
+    //return reg_.read-u16-be REGISTER-CALIBRATION_
 
   /**
   $set-calibration-value: Sets calibration value.  
@@ -223,9 +224,7 @@ class Ina226:
   manually is not normally required.  See Datasheet pp.10.
   */
   set-calibration-value value/int -> none:
-    old-value := reg_.read-u16-be REGISTER-CALIBRATION_
-    reg_.write-u16-be REGISTER-CALIBRATION_ value
-    logger_.debug "calibration-value: changed from $(old-value) to $(value)"
+    write-register_ --register=REGISTER-CALIBRATION_ --value=value
 
   /** 
   $set-sampling-rate rate: Adjust Sampling Rate for measurements.  
@@ -236,13 +235,9 @@ class Ina226:
   single measurement.  This is the register code/enum value, not actual rate. Can be
   converted back using  $get-sampling-rate --count={enum}
   */
+
   set-sampling-rate code/int -> none:
-    old-value/int  := reg_.read-u16-be REGISTER-CONFIG_
-    new-value/int  := old-value
-    new-value      &= ~(CONF-AVERAGE-MASK_)
-    new-value      |= (code << 9)
-    reg_.write-u16-be REGISTER-CONFIG_ new-value
-    logger_.debug "sampling-rate: set from 0x$(%02x old-value) to 0x$(%02x new-value)"
+    write-register_ --register=REGISTER-CONFIG_ --mask=CONF-AVERAGE-MASK_ --offset=CONF-AVERAGE-OFFSET_ --value=code
 
   /**
   $get-sampling-rate --code: Retrieve current sampling rate selector/enum.
@@ -253,7 +248,7 @@ class Ina226:
   single measurement.
   */
   get-sampling-rate -> int:
-    return ((reg_.read-u16-be REGISTER-CONFIG_ & CONF-AVERAGE-MASK_) >> 9)
+    return read-register_ --register=REGISTER-CONFIG_ --mask=CONF-AVERAGE-MASK_ --offset=CONF-AVERAGE-OFFSET_
 
   /** $get-sampling-rate --count: Return human readable sampling count number. */
   get-sampling-rate-us -> int:
@@ -273,25 +268,22 @@ class Ina226:
 
   /**
   $set-bus-conversion-time: Sets conversion-time for bus only. See 'Conversion Time'.
-  */  
-  set-bus-conversion-time bus/int -> none:
-    old-value/int := reg_.read-u16-be REGISTER-CONFIG_
-    new-value/int := old-value
-    new-value     &= ~CONF-BUSVC-MASK_
-    new-value     |= (bus << CONF-BUSVC-OFFSET_)
-    reg_.write-u16-be REGISTER-CONFIG_ new-value
-    logger_.debug "set-bus-conversion-time: REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
+  */
+  set-bus-conversion-time code/int -> none:
+    write-register_ --register=REGISTER-CONFIG_ --mask=CONF-BUSVC-MASK_ --offset=CONF-BUSVC-OFFSET_ --value=code
+
+  get-bus-conversion-time -> int:
+    return read-register_ --register=REGISTER-CONFIG_ --mask=CONF-BUSVC-MASK_ --offset=CONF-BUSVC-OFFSET_
 
   /**
   $set-shunt-conversion-time: Sets conversion-time for shunt only. See 'Conversion Time'.
   */  
-  set-shunt-conversion-time shunt/int -> none:
-    old-value/int := reg_.read-u16-be REGISTER-CONFIG_
-    new-value/int := old-value
-    new-value     &= ~CONF-SHUNTVC-MASK_
-    new-value     |= (shunt << CONF-SHUNTVC-OFFSET_)
-    reg_.write-u16-be REGISTER-CONFIG_ new-value
-    logger_.debug "set-shunt-conversion-time: REGISTER-CONFIG_ set from 0x$(%02x old-value) to 0x$(%02x new-value)"
+  set-shunt-conversion-time code/int -> none:
+    write-register_ --register=REGISTER-CONFIG_ --mask=CONF-SHUNTVC-MASK_ --offset=CONF-SHUNTVC-OFFSET_ --value=code
+
+  get-shunt-conversion-time -> int:
+    return read-register_ --register=REGISTER-CONFIG_ --mask=CONF-SHUNTVC-MASK_ --offset=CONF-SHUNTVC-OFFSET_
+
 
   /** 
   $set-measure-mode: Sets Measure Mode. 
@@ -312,12 +304,11 @@ class Ina226:
   See section 6.6 of the Datasheet 'Electrical Characteristics'.
   */
   set-measure-mode mode/int -> none:
-    old-value/int := reg_.read-u16-be REGISTER-CONFIG_
-    new-value/int := old-value
-    new-value     &= ~(CONF-MODE-MASK_)
-    new-value     |= mode                 // low value, no left shift offset.
-    reg_.write-u16-be REGISTER-CONFIG_ new-value
+    write-register_ --register=REGISTER-CONFIG_ --mask=CONF-MODE-MASK_ --offset=CONF-MODE-OFFSET_ --value=mode
     if (mode != MODE-POWER-DOWN): last-measure-mode_ = mode
+
+  get-measure-mode -> int:
+    return read-register_ --register=REGISTER-CONFIG_ --mask=CONF-MODE-MASK_ --offset=CONF-MODE-OFFSET_
 
   /**
   $set-power-off: simple alias for disabling device.
@@ -340,7 +331,7 @@ class Ina226:
   Set shunt resistor value, input is in Ohms. If no --max-current is computed from +/-81.92 mV full scale. 
   Current range in amps.
   */
-  set-shunt-resistor resistor/float --max-current/float=(ADC-FULL-SCALE-SHUNT-VOLTAGE-LIMIT/resistor) -> none:
+  set-shunt-resistor resistor/float --max-current/float=(SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/resistor) -> none:
     shunt-resistor_        = resistor                                              // Cache to class-wide for later use.
     max-current_           = max-current                                           // Cache to class-wide for later use.
     current-LSB_           = (max-current_ / 32768.0)                              // Amps per bit (eg. LSB).
@@ -350,7 +341,7 @@ class Ina226:
     set-calibration-value  (new-calibration-value).round
     current-divider-ma_    = 0.001 / current-LSB_
     power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
-    logger_.debug "shunt-resistor: (32767 * current-LSB_)=$(32767 * current-LSB_) compared to $(max-current_)"
+    //logger_.debug "shunt-resistor: (32767 * current-LSB_)=$(32767 * current-LSB_) compared to $(max-current_)"
 
   /**
   $read-shunt-current: Return shunt current in amps. 
@@ -370,7 +361,7 @@ class Ina226:
   */   
   read-shunt-voltage -> float:
     value := reg_.read-i16-be REGISTER-SHUNT-VOLTAGE_
-    return (value * 0.0000025)
+    return (value * SHUNT-VOLTAGE-LSB_)
 
   /**
   $read-supply-voltage --volts: Upstream voltage, before the shunt (IN+).
@@ -391,7 +382,7 @@ class Ina226:
   */
   read-bus-voltage -> float:
     value := reg_.read-i16-be REGISTER-BUS-VOLTAGE_
-    return (value * 0.00125)
+    return value * BUS-VOLTAGE-LSB_
   
   /**
   $read-load-power: Watts used by the load.
@@ -477,16 +468,9 @@ class Ina226:
       throw "set-alert: unexpected alert type"
     
     // Set Alert Type Flag.
-    old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    new-value/int := old-value
-    new-value     &= ~(0xF800)    // Clear old alert values (bits D11 to D15) - only one alert allowed at once.
-    new-value     |= type         // Already bit shifted in the mask constants!
-    reg_.write-u16-be REGISTER-MASK-ENABLE_ new-value
-    logger_.debug "set-alert: mask $(bits-16 old-value) to $(bits-16 new-value)"
-
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=0xF800 --offset=0 --value=type
     // Set Alert Limit Value
-    reg_.write-u16-be REGISTER-ALERT-LIMIT_ (alert-limit).to-int
-    logger_.debug "set-alert: alert limit set to $(alert-limit)"
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=alert-limit
 
   /** 
   $set-alert-latch: "Latching".
@@ -500,21 +484,14 @@ class Ina226:
   */
   set-alert-latch set/int -> none:
     assert: 0 <= set <= 1
-    old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    new-value/int := old-value
-    new-value     &= ~(ALERT-LATCH-ENABLE-BIT_)
-    new-value     |= (set << ALERT-LATCH-ENABLE-OFFSET_)
-    reg_.write-u16-be REGISTER-MASK-ENABLE_ new-value
-    logger_.debug "alert-latch alert-pin $(set) is $(bits-16 old-value) to $(bits-16 new-value)"
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE-BIT_ --offset=CONF-MODE-OFFSET_ --value=set
 
   /** 
   $get-alert-latch: Retrieve Latch Configuration.
   */
   get-alert-latch -> int:
-    value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    latchBit/int := ((value & ALERT-LATCH-ENABLE-BIT_) >> ALERT-LATCH-ENABLE-OFFSET_) & ALERT-LATCH-ENABLE-LENGTH_
-    return latchBit
-  
+    return read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE-BIT_ --offset=ALERT-LATCH-ENABLE-OFFSET_
+
   /** 
   $set-alert-pin-polarity: Alert pin polarity functions.
   
@@ -524,22 +501,13 @@ class Ina226:
   */
   set-alert-pin-polarity set/int -> none:
     assert: 0 <= set <= 1
-    old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    new-value/int := old-value
-    new-value     &= ~(ALERT-PIN-POLARITY-BIT_)
-    new-value     |= (set << ALERT-PIN-POLARITY-OFFSET_)
-    reg_.write-u16-be REGISTER-MASK-ENABLE_ new-value
-    logger_.debug "alert-pin-polarity: alert-pin $(set) is $(bits-16 old-value) to $(bits-16 new-value)"
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-PIN-POLARITY-BIT_ --offset=ALERT-PIN-POLARITY-OFFSET_ --value=set
 
   /** 
   $get-alert-pin-polarity: Retrieve configured alert pin polarity setting. See '$set-alert-pin-polarity'.
   */
   get-alert-pin-polarity -> int:
-    // inverted = true, normal = false
-    value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    polarityInvertedBit/int := ((value & ALERT-PIN-POLARITY-BIT_) >> ALERT-PIN-POLARITY-OFFSET_) & ALERT-PIN-POLARITY-LENGTH_
-    logger_.debug "alert-pin-polarity: is $(polarityInvertedBit)"
-    return polarityInvertedBit
+    return read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-PIN-POLARITY-BIT_ --offset=ALERT-PIN-POLARITY-OFFSET_
 
   /** 
   $alert: return true if any of the three alerts exists.
@@ -567,7 +535,7 @@ class Ina226:
 
   /** 
   $overflow-alert: returns true if an overflow alert exists.
-  */
+
   overflow-alert  -> bool:
     value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     overflow/bool := false
@@ -575,17 +543,29 @@ class Ina226:
     if overflow-bit == 1: overflow = true
     logger_.debug "alert --overflow: overflow bit is $(overflow-bit) [$(overflow)]"
     return overflow
+  */
+  overflow-alert  -> bool:
+    overflow/bool := false
+    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-MATH-OVERFLOW-FLAG_ --offset=ALERT-MATH-OVERFLOW-OFFSET_) == 1: 
+      overflow = true
+    return overflow
 
   /** 
   $limit-alert: returns true if a set alert limit is exceeded.
-  */
-  limit-alert  -> bool:
+
+  limit-alert -> bool:
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
     limit := false
     limit-bit := ((register & ALERT-FUNCTION-FLAG_) >> ALERT-FUNCTION-OFFSET_ ) & ALERT-FUNCTION-LENGTH_
     if limit-bit == 1: limit = true
     logger_.debug "limit-alert: configured limit bit is $(limit-bit) [$(limit)]"
     return limit
+  */
+  limit-alert -> bool:
+    overflow/bool := false
+    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-FUNCTION-FLAG_ --offset=ALERT-FUNCTION-OFFSET_) == 1: 
+      overflow = true
+    return overflow
 
   /** 
   $conversion-ready-alert: Determine If conversion is complete.
@@ -599,12 +579,10 @@ class Ina226:
       2. Reading the Mask/Enable Register (Implemented in $clear-alert).
   */
   conversion-ready-alert -> bool:
-    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    conversion-ready := false
-    conversion-ready-bit := ((register & ALERT-CONVERSION-READY-FLAG_) >> ALERT-CONVERSION-READY-OFFSET_ ) & ALERT-CONVERSION-READY-LENGTH_
-    if conversion-ready-bit == 1: conversion-ready = true
-    logger_.debug "conversion-ready-alert: conversion ready bit is $(conversion-ready-bit) [$(conversion-ready)]"
-    return conversion-ready
+    ready/bool := false
+    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-CONVERSION-READY-FLAG_ --offset=ALERT-CONVERSION-READY-OFFSET_) == 1: 
+      ready = true
+    return ready 
 
   /** 
   $is-conversion-ready: alias returning true/false for $conversion-ready-alert.
@@ -618,12 +596,7 @@ class Ina226:
   */
   set-conversion-ready set/int -> none:
     assert: 0 <= set <= 1
-    old-value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    new-value/int := old-value
-    new-value     &= ~(CONVERSION-READY-BIT_)
-    new-value     |= (set << CONVERSION-READY-OFFSET_) // Already bit shifted.
-    reg_.write-u16-be REGISTER-MASK-ENABLE_ new-value
-    logger_.debug "conversion-ready: alert-pin $(set) is $(bits-16 old-value) to $(bits-16 new-value)"
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=CONVERSION-READY-BIT_ --offset=CONVERSION-READY-OFFSET_ --value=set
 
   /** 
   $set-conversion-ready --enable-alert-pin: Helpful alias for setting 'conversion-ready' on alert pin.
@@ -667,7 +640,6 @@ class Ina226:
     if code == AVERAGE-1024-SAMPLES: return 1024
     return 1  // default/defensive - should never happen
 
-
   /** 
   $get-estimated-conversion-time-ms: estimate a worst-case maximum waiting time based on the configuration.
   
@@ -676,20 +648,10 @@ class Ina226:
   */
   get-estimated-conversion-time-ms -> int:
     // Read config and decode fields using masks/offsets
-    config-reg-value/int              := reg_.read-u16-be REGISTER-CONFIG_
-
-    samples-code/int                  := (config-reg-value & CONF-AVERAGE-MASK_)  >> CONF-AVERAGE-OFFSET_
-    bus-conversion-time-code/int      := (config-reg-value & CONF-BUSVC-MASK_)    >> CONF-BUSVC-OFFSET_
-    shunt-conversion-time-code/int    := (config-reg-value & CONF-SHUNTVC-MASK_)  >> CONF-SHUNTVC-OFFSET_
-    mode/int                          := (config-reg-value & CONF-MODE-MASK_)     >> CONF-MODE-OFFSET_
-
-    sampling-rate/int                 := get-sampling-rate-from-enum samples-code
-    bus-conversion-time/int           := get-conversion-time-us-from-enum bus-conversion-time-code
-    shunt-conversion-time/int         := get-conversion-time-us-from-enum shunt-conversion-time-code
-
-    // Mode 0x7 = bus+shunt continuous, 0x3 = bus+shunt triggered (single-shot).
-    // If converting to support bus-only or shunt-only modes, drop the other term.
-    totalus/int    := (bus-conversion-time + shunt-conversion-time) * sampling-rate
+    sampling-rate/int         := get-sampling-rate-from-enum get-sampling-rate
+    bus-conversion-time/int   := get-conversion-time-us-from-enum get-bus-conversion-time
+    shunt-conversion-time/int := get-conversion-time-us-from-enum get-shunt-conversion-time
+    totalus/int               := (get-bus-conversion-time + get-shunt-conversion-time) * sampling-rate
 
     // Add a small guard factor (~10%) to be conservative.
     totalus = ((totalus * 11.0) / 10.0).to-int
@@ -707,9 +669,7 @@ class Ina226:
   Useful if expanding driver to suit an additional sibling devices.
   */
   read-manufacturer-id -> int:
-    manid := reg_.read-u16-be REGISTER-MANUF-ID_
-    //logger_.debug "manufacturer-id: is 0x$(%04x manid) [$(manid)]"
-    return manid
+    return reg_.read-u16-be REGISTER-MANUF-ID_
   
   /** 
   $read-device-identification: returns integer of device ID bits from register.
@@ -717,10 +677,7 @@ class Ina226:
   Bits 4-15 Stores the device identification bits.
   */
   read-device-identification -> int:
-    register := reg_.read-u16-be REGISTER-DIE-ID_
-    die-id-device-id := (register & DIE-ID-DID-MASK_) >> 4
-    //logger_.debug "device-identification: is 0x$(%04x dieidDid) [$(dieidDid)]"
-    return die-id-device-id
+    return read-register_ --register=REGISTER-DIE-ID_ --mask=DIE-ID-DID-MASK_ --offset=DIE-ID-DID-OFFSET_
 
   /** 
   $read-device-revision: Die Revision ID Bits.
@@ -728,10 +685,50 @@ class Ina226:
   Bits 0-3 store the device revision number bits.
   */
   read-device-revision -> int:
-    register := reg_.read-u16-be REGISTER-DIE-ID_
-    die-id-revision-id := (register & DIE-ID-RID-MASK_)
-    //logger_.debug "device-revision: is 0x$(%04x dieidRid) [$(dieidRid)]"
-    return die-id-revision-id
+    return read-register_ --register=REGISTER-DIE-ID_ --mask=DIE-ID-RID-MASK_ --offset=0
+
+  /** 
+  $read-register_: Given that register reads are largely similar, implemented here.
+
+  If the mask is left at 0xFFFF and offset at 0x0, it is a read from the whole register.
+  */
+  read-register_ --register/int --mask/int=0xFFFF --offset/int=0 -> any:
+    register-value := reg_.read-u16-be register
+    if mask == 0xFFFF and offset == 0:
+      //logger_.debug "read-register_: reg-0x$(%02x register) is $(%04x register-value)"
+      return register-value
+    else:
+      masked-value := (register-value & mask) >> offset
+      //logger_.debug "read-register_: reg-0x$(%02x register) is $(bits-16 register-value) mask=[$(bits-16 mask) + offset=$(offset)] [$(bits-16 masked-value)]"
+      return masked-value
+
+  /** 
+  $write-register_: Given that register writes are largely similar, implemented here.
+
+  If the mask is left at 0xFFFF and offset at 0x0, it is a write to the whole register.
+  */
+  write-register_ --register/int --mask/int=0xFFFF --offset/int=0 --value/any --note/string="" -> none:
+    max/int := mask >> offset                // allowed value range within field
+    assert: ((value & ~max) == 0)            // value fits the field
+    old-value/int := reg_.read-u16-be register
+
+    // Split out the simple case
+    if (mask == 0xFFFF) and (offset == 0):
+      reg_.write-u16-be register (value & 0xFFFF)
+      //logger_.debug "write-register_: Register 0x$(%02x register) set from $(%04x old-value) to $(%04x value) $(note)"
+    else:
+      new-value/int := old-value
+      new-value     &= ~mask
+      new-value     |= (value << offset)
+      reg_.write-u16-be register new-value
+      //logger_.debug "write-register_: Register 0x$(%02x register) set from $(bits-16 old-value) to $(bits-16 new-value) $(note)"
+
+  /** 
+  bit-functions: Given here to help simplify code 
+  */
+  set-bit value/int mask/int -> int:    return value | mask
+  clear-bit value/int mask/int -> int:  return value & ~mask
+  toggle-bit value/int mask/int -> int: return value ^ mask
 
   /** 
   $print-diagnostics: Print Diagnostic Information.
@@ -802,14 +799,22 @@ class Ina226:
   /** 
   $bits-16: Displays bitmasks nicely when testing.
   */
-  bits-16 x/int --display-bits/int=8 -> string:
-    if (x > 255) or (display-bits > 8):
+  bits-16 x/int --min-display-bits/int=0 -> string:
+    if (x > 255) or (min-display-bits > 8):
       out-string := "$(%b x)"
       out-string = out-string.pad --left 16 '0'
       out-string = "$(out-string[0..4]).$(out-string[4..8]).$(out-string[8..12]).$(out-string[12..16])"
+      //logger_.debug "bits-16: 16 $(x) $(%0b x) gave $(out-string)"
       return out-string
-    else:
+    else if (x > 15) or (min-display-bits > 4):
       out-string := "$(%b x)"
       out-string = out-string.pad --left 8 '0'
       out-string = "$(out-string[0..4]).$(out-string[4..8])"
+      //logger_.debug "bits-16: 08 $(x) $(%0b x) gave $(out-string)"
+      return out-string
+    else:
+      out-string := "$(%b x)"
+      out-string = out-string.pad --left 4 '0'
+      out-string = "$(out-string[0..4])"
+      //logger_.debug "bits-16: 04 $(x) $(%0b x) gave $(out-string)"
       return out-string
