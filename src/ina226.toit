@@ -50,16 +50,36 @@ class Ina226:
   static MODE-CONTINUOUS                       ::= 0b111 // Class Default.
 
   /**
-  Alert Types that can set off the alert register and/or alert pin. See $set-alert
+  Alert Types that can set off the alert register and/or alert pin. See set-alert... 
+  functions.  These masks are set in the $REGISTER-MASK-ENABLE_ Register.
   */
-  static ALERT-SHUNT-OVER-VOLTAGE              ::= 0x8000
-  static ALERT-SHUNT-UNDER-VOLTAGE             ::= 0x4000
-  static ALERT-BUS-OVER-VOLTAGE                ::= 0x2000
-  static ALERT-BUS-UNDER-VOLTAGE               ::= 0x1000
-  static ALERT-POWER-OVER                      ::= 0x0800
-  static ALERT-CURRENT-OVER                    ::= 0xFFFE
-  static ALERT-CURRENT-UNDER                   ::= 0xFFFF
-  static ALERT-CONVERSION-READY                ::= 0x0400
+  static ALERT-SHUNT-OVER-VOLTAGE              ::= 0b10000000_00000000
+  static ALERT-SHUNT-OVER-VOLTAGE-OFFSET_      ::= 15
+  static ALERT-SHUNT-UNDER-VOLTAGE             ::= 0b01000000_00000000
+  static ALERT-SHUNT-UNDER-VOLTAGE-OFFSET_     ::= 14
+  static ALERT-BUS-OVER-VOLTAGE                ::= 0b00100000_00000000
+  static ALERT-BUS-OVER-VOLTAGE-OFFSET_        ::= 13
+  static ALERT-BUS-UNDER-VOLTAGE               ::= 0b00010000_00000000
+  static ALERT-BUS-UNDER-VOLTAGE-OFFSET_       ::= 12
+  static ALERT-POWER-OVER                      ::= 0b00001000_00000000
+  static ALERT-POWER-OVER-OFFSET_              ::= 11
+  static ALERT-CONVERSION-READY                ::= 0b00000100_00000000
+  static ALERT-CONVERSION-READY-OFFSET_        ::= 10
+  static ALERT-PIN-POLARITY_                   ::= 0b00000000_00000010
+  static ALERT-PIN-POLARITY-OFFSET_            ::= 1
+  static ALERT-LATCH-ENABLE_                   ::= 0b00000000_00000001
+  static ALERT-LATCH-ENABLE-OFFSET_            ::= 0
+
+  /**
+  Actual Alert Flags
+  */
+  static FUNCTION-ALERT-FLAG_                  ::= 0b00000000_00010000
+  static FUNCTION-ALERT-OFFSET_                ::= 4
+  static MATH-OVERFLOW-ALERT-FLAG_             ::= 0b00000000_00000100
+  static MATH-OVERFLOW-ALERT-OFFSET_           ::= 2
+  static CONVERSION-READY-ALERT-FLAG_          ::= 0b00000100_00001000
+  static CONVERSION-READY-ALERT-OFFSET_        ::= 3
+
 
   /** 
   Sampling options used for measurements. To be used with $set-sampling-rate
@@ -119,26 +139,6 @@ class Ina226:
   static CONF-BUSVC-OFFSET_                    ::= 6
   static CONF-MODE-MASK_                       ::= 0x0007
   static CONF-MODE-OFFSET_                     ::= 0
-
-  //  Get Alert Flag.
-  static ALERT-CONVERSION-READY-FLAG_          ::= 0x0008
-  static ALERT-CONVERSION-READY-OFFSET_        ::= 3
-  static ALERT-CONVERSION-READY-LENGTH_        ::= 1
-  static ALERT-FUNCTION-FLAG_                  ::= 0x0010
-  static ALERT-FUNCTION-OFFSET_                ::= 4
-  static ALERT-FUNCTION-LENGTH_                ::= 1
-  static ALERT-MATH-OVERFLOW-FLAG_             ::= 0x0004
-  static ALERT-MATH-OVERFLOW-OFFSET_           ::= 2
-  static ALERT-MATH-OVERFLOW-LENGTH_           ::= 1
-  static ALERT-PIN-POLARITY-BIT_               ::= 0x0002
-  static ALERT-PIN-POLARITY-OFFSET_            ::= 1
-  static ALERT-PIN-POLARITY-LENGTH_            ::= 1
-  static ALERT-LATCH-ENABLE-BIT_               ::= 0x0001
-  static ALERT-LATCH-ENABLE-OFFSET_            ::= 0
-  static ALERT-LATCH-ENABLE-LENGTH_            ::= 1
-  static CONVERSION-READY-BIT_                 ::= 0x0800
-  static CONVERSION-READY-OFFSET_              ::= 11
-  static CONVERSION-READY-LENGTH_              ::= 1
 
   static INTERNAL_SCALING_VALUE_/float         ::= 0.00512
   static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.08192    // volts.
@@ -350,6 +350,7 @@ class Ina226:
   */ 
   read-shunt-current -> float:
     value   := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
+    //logger_.debug "method1=$(%0.6f value * current-LSB_) method2=$(%0.6f value * SHUNT-VOLTAGE-LSB_ / shunt-resistor_)"
     return (value * current-LSB_)
 
   /** 
@@ -401,8 +402,7 @@ class Ina226:
   for with the loop in 'wait-until-' functions'.)
   */
   busy -> bool:
-    value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_              // Reading clears CNVR (Conversion Ready) Flag.
-    return ((value & ALERT-CONVERSION-READY-FLAG_) == 0)
+    return conversion-ready
 
   /**
   $wait-until-conversion-completed: execution blocked until conversion is completed.
@@ -431,42 +431,95 @@ class Ina226:
     if wait: wait-until-conversion-completed
 
   /** 
-  $set-alert: configures the various alert types.
+  set-alert... : configures the various alert types.
 
   Requires a value from the alert type enum.  If multiple functions are enabled the highest 
   significant bit position Alert Function (D15-D11) takes priority and responds to the Alert
   Limit Register.  ie. only one alert of one type can be configured simultaneously.  Whatever
-  is in the alert value (register) at that time, is then the alert trigger value.
+  is in the alert value (register) at that time, is then the alert trigger value.  For this 
+  reason, this code clears other alert types when setting.
 
   Limits must be supplied in base SI units (volts, amps and watts) only.
   */
-  set-alert --type/int --limit/float -> none:
-    alert-limit/float := 0.0
+  set-shunt-over-voltage-alert limit/float -> none:
+    disable-all-alerts
+    raw-limit/int := (limit / SHUNT-VOLTAGE-LSB_).round
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-SHUNT-OVER-VOLTAGE --offset=ALERT-SHUNT-OVER-VOLTAGE-OFFSET_ --value=1
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=raw-limit
 
-    if type == ALERT-SHUNT-OVER-VOLTAGE:             // Alert limit in VOLTS.
-      alert-limit = limit * 400000.0          
-    else if type == ALERT-SHUNT-UNDER-VOLTAGE:       // Alert limit in VOLTS.
-      alert-limit = limit * 400000.0
-    else if type == ALERT-CURRENT-OVER:
-      type = ALERT-SHUNT-OVER-VOLTAGE
-      alert-limit = limit * shunt-resistor_ * 400000.0
-    else if type == ALERT-CURRENT-UNDER:
-      type = ALERT-SHUNT-UNDER-VOLTAGE
-      alert-limit = limit * shunt-resistor_ * 400000.0
-    else if type == ALERT-BUS-OVER-VOLTAGE:          // limit is in volts (1.25 mV / LSB ⇒ 800 counts per volt)
-      alert-limit = limit * 800.0
-    else if type == ALERT-BUS-UNDER-VOLTAGE:         // limit is in volts (1.25 mV / LSB ⇒ 800 counts per volt)
-      alert-limit = limit * 800.0
-    else if type == ALERT-POWER-OVER:
-      alert-limit = limit / power-multiplier-mw_
-    else:
-      logger_.debug "set-alert: unexpected alert type"
-      throw "set-alert: unexpected alert type"
-    
-    // Set Alert Type Flag.
-    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=0xF800 --offset=0 --value=type
-    // Set Alert Limit Value
-    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=alert-limit
+  set-shunt-under-voltage-alert limit/float -> none:
+    disable-all-alerts
+    raw-limit/int := (limit / SHUNT-VOLTAGE-LSB_).round
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-SHUNT-UNDER-VOLTAGE --offset=ALERT-SHUNT-UNDER-VOLTAGE-OFFSET_ --value=1
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=raw-limit
+
+  set-shunt-over-current-alert limit/float -> none:
+    disable-all-alerts
+    full-scale-current := (SHUNT-FULL-SCALE-VOLTAGE-LIMIT_ / shunt-resistor_)
+    if limit > full-scale-current:
+      logger_.warn "set-shunt-over-current-alert: limit $(%0.6f limit) A exceeds full-scale $(%0.6f full-scale-current) A; clamping."
+      limit = full-scale-current
+    raw-limit/int := (limit * shunt-resistor_ / SHUNT-VOLTAGE-LSB_).round
+    if raw-limit > 32767:  raw-limit = 32767
+    if raw-limit < -32768: raw-limit = -32768
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-SHUNT-OVER-VOLTAGE --offset=ALERT-SHUNT-OVER-VOLTAGE-OFFSET_ --value=1
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=raw-limit
+
+  set-shunt-under-current-alert limit/float -> none:
+    disable-all-alerts
+    full-scale-current := (SHUNT-FULL-SCALE-VOLTAGE-LIMIT_ / shunt-resistor_)
+    if limit > full-scale-current:
+      logger_.warn "set-shunt-over-current-alert: limit $(%0.6f limit) A exceeds full-scale $(%0.6f full-scale-current) A; clamping."
+      limit = full-scale-current
+    raw-limit/int := (limit * shunt-resistor_ / SHUNT-VOLTAGE-LSB_).round
+    if raw-limit > 32767:  raw-limit = 32767
+    if raw-limit < -32768: raw-limit = -32768
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-SHUNT-UNDER-VOLTAGE --offset=ALERT-SHUNT-UNDER-VOLTAGE-OFFSET_ --value=1
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=raw-limit
+
+  set-bus-over-voltage-alert limit/float -> none:
+    disable-all-alerts
+    raw-limit/int := (limit / BUS-VOLTAGE-LSB_).round
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-BUS-OVER-VOLTAGE --offset=ALERT-BUS-OVER-VOLTAGE-OFFSET_ --value=1
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=raw-limit
+    //raw-check-value := reg_.read-i16-be REGISTER-ALERT-LIMIT_
+    //register-value  := read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-BUS-OVER-VOLTAGE --offset=ALERT-BUS-OVER-VOLTAGE-MASK_
+    //logger_.debug "set-power-over-alert ($(register-value)): raw=$(raw-check-value) mathed=$(raw-check-value * BUS-VOLTAGE-LSB_)"
+
+  set-bus-under-voltage-alert limit/float -> none:
+    disable-all-alerts
+    raw-limit/int := (limit / BUS-VOLTAGE-LSB_ ).round
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-BUS-UNDER-VOLTAGE --offset=ALERT-BUS-UNDER-VOLTAGE-OFFSET_ --value=1
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=raw-limit
+    //raw-check-value := reg_.read-i16-be REGISTER-ALERT-LIMIT_
+    //logger_.debug "set-power-over-alert: raw=$(raw-check-value) mathed=$(raw-check-value * BUS-VOLTAGE-LSB_)"
+
+  set-power-over-alert limit/float -> none:
+    disable-all-alerts
+    raw-limit/int := (limit / power-multiplier-mw_).round
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-POWER-OVER --offset=ALERT-POWER-OVER-OFFSET_ --value=1
+    write-register_ --register=REGISTER-ALERT-LIMIT_ --value=raw-limit
+
+  /** 
+  $set-conversion-ready-alert: Configure the alert function enabling the pin to be used to signal conversion ready.
+  */
+  set-conversion-ready-alert -> none:
+    disable-all-alerts
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-CONVERSION-READY --offset=ALERT-CONVERSION-READY-OFFSET_ --value=1
+
+  /** $disable-all-alerts:
+
+  The INA226 has several alert features but only one pin, therefore only one alert 
+  can be configured at once.  This clears all alert bits for the purpose of setting
+  another alert pin. 
+  */
+  disable-all-alerts -> none:
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-SHUNT-OVER-VOLTAGE --offset=ALERT-SHUNT-OVER-VOLTAGE-OFFSET_ --value=0
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-SHUNT-UNDER-VOLTAGE --offset=ALERT-SHUNT-UNDER-VOLTAGE-OFFSET_ --value=0
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-BUS-OVER-VOLTAGE --offset=ALERT-BUS-OVER-VOLTAGE-OFFSET_ --value=0
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-BUS-UNDER-VOLTAGE --offset=ALERT-BUS-UNDER-VOLTAGE-OFFSET_ --value=0
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-POWER-OVER --offset=ALERT-POWER-OVER-OFFSET_ --value=0
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-CONVERSION-READY --offset=ALERT-CONVERSION-READY-OFFSET_ --value=0
 
   /** 
   $set-alert-latch: "Latching".
@@ -480,13 +533,17 @@ class Ina226:
   */
   set-alert-latch set/int -> none:
     assert: 0 <= set <= 1
-    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE-BIT_ --offset=CONF-MODE-OFFSET_ --value=set
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE_ --offset=ALERT-LATCH-ENABLE-OFFSET_ --value=set
+  enable-alert-latch -> none:
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE_ --offset=ALERT-LATCH-ENABLE-OFFSET_ --value=1
+  disable-alert-latch -> none:
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE_ --offset=ALERT-LATCH-ENABLE-OFFSET_ --value=0
 
   /** 
   $get-alert-latch: Retrieve Latch Configuration.
   */
   get-alert-latch -> int:
-    return read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE-BIT_ --offset=ALERT-LATCH-ENABLE-OFFSET_
+    return read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-LATCH-ENABLE_ --offset=ALERT-LATCH-ENABLE-OFFSET_
 
   /** 
   $set-alert-pin-polarity: Alert pin polarity functions.
@@ -497,29 +554,13 @@ class Ina226:
   */
   set-alert-pin-polarity set/int -> none:
     assert: 0 <= set <= 1
-    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-PIN-POLARITY-BIT_ --offset=ALERT-PIN-POLARITY-OFFSET_ --value=set
+    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-PIN-POLARITY_ --offset=ALERT-PIN-POLARITY-OFFSET_ --value=set
 
   /** 
   $get-alert-pin-polarity: Retrieve configured alert pin polarity setting. See '$set-alert-pin-polarity'.
   */
   get-alert-pin-polarity -> int:
-    return read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-PIN-POLARITY-BIT_ --offset=ALERT-PIN-POLARITY-OFFSET_
-
-  /** 
-  $alert: return true if any of the three alerts exists.
-
-  Slightly different to other implementations. This method attempts to keep alerts visible 
-  as a value on the class object, so as not to be stored separately from the source of truth
-  and therefore risk being stale.  So these functions attempt to source the current status 
-  of each alert from the device itself.
-  */
-  alert -> bool:
-    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    if (register & ALERT-MATH-OVERFLOW-FLAG_) != 0: logger_.debug "alert: ALERT-MATH-OVERFLOW-FLAG_"
-    if (register & ALERT-FUNCTION-FLAG_) != 0: logger_.debug "alert: ALERT-FUNCTION-FLAG_"
-    if (register & ALERT-CONVERSION-READY-FLAG_) != 0: logger_.debug "alert: ALERT-CONVERSION-READY-FLAG_"
-    checkMask    := ALERT-MATH-OVERFLOW-FLAG_ | ALERT-FUNCTION-FLAG_ | ALERT-CONVERSION-READY-FLAG_
-    return (register & checkMask) != 0
+    return read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-PIN-POLARITY_ --offset=ALERT-PIN-POLARITY-OFFSET_
 
   /**
   $clear-alert: clears alerts.
@@ -530,41 +571,7 @@ class Ina226:
     register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
 
   /** 
-  $overflow-alert: returns true if an overflow alert exists.
-
-  overflow-alert  -> bool:
-    value/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    overflow/bool := false
-    overflow-bit := ((value & ALERT-MATH-OVERFLOW-FLAG_) >> ALERT-MATH-OVERFLOW-OFFSET_ ) & ALERT-MATH-OVERFLOW-LENGTH_
-    if overflow-bit == 1: overflow = true
-    logger_.debug "alert --overflow: overflow bit is $(overflow-bit) [$(overflow)]"
-    return overflow
-  */
-  overflow-alert  -> bool:
-    overflow/bool := false
-    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-MATH-OVERFLOW-FLAG_ --offset=ALERT-MATH-OVERFLOW-OFFSET_) == 1: 
-      overflow = true
-    return overflow
-
-  /** 
-  $limit-alert: returns true if a set alert limit is exceeded.
-
-  limit-alert -> bool:
-    register/int := reg_.read-u16-be REGISTER-MASK-ENABLE_
-    limit := false
-    limit-bit := ((register & ALERT-FUNCTION-FLAG_) >> ALERT-FUNCTION-OFFSET_ ) & ALERT-FUNCTION-LENGTH_
-    if limit-bit == 1: limit = true
-    logger_.debug "limit-alert: configured limit bit is $(limit-bit) [$(limit)]"
-    return limit
-  */
-  limit-alert -> bool:
-    overflow/bool := false
-    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-FUNCTION-FLAG_ --offset=ALERT-FUNCTION-OFFSET_) == 1: 
-      overflow = true
-    return overflow
-
-  /** 
-  $conversion-ready-alert: Determine If conversion is complete.
+  $conversion-ready: Determine If conversion is complete.
   
   Although the device can be read at any time, and the data from the last conversion
   is available, the Conversion Ready Flag bit is provided to help coordinate one-shot
@@ -574,37 +581,42 @@ class Ina226:
       1. Writing to the Configuration Register (except for Power-Down selection).
       2. Reading the Mask/Enable Register (Implemented in $clear-alert).
   */
-  conversion-ready-alert -> bool:
-    ready/bool := false
-    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=ALERT-CONVERSION-READY-FLAG_ --offset=ALERT-CONVERSION-READY-OFFSET_) == 1: 
-      ready = true
-    return ready 
+  conversion-ready -> bool:
+    conversion/bool := false
+    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=CONVERSION-READY-ALERT-FLAG_ --offset=CONVERSION-READY-ALERT-OFFSET_) == 1: 
+      conversion = true
+    return conversion
 
   /** 
-  $is-conversion-ready: alias returning true/false for $conversion-ready-alert.
+  $alert-overflow: returns true if an overflow alert exists.
+
+  This bit is set to '1' if an arithmetic operation resulted in an overflow error. The 
+  bit indicates that current and power data can be invalid.
   */
-  is-conversion-ready -> bool:
-    return conversion-ready-alert
-  
-  /** 
-  $set-conversion-ready --set/int: Configure the alert function enabling the pin to
-  be used to signal conversion ready.
-  */
-  set-conversion-ready set/int -> none:
-    assert: 0 <= set <= 1
-    write-register_ --register=REGISTER-MASK-ENABLE_ --mask=CONVERSION-READY-BIT_ --offset=CONVERSION-READY-OFFSET_ --value=set
+  alert-overflow  -> bool:
+    over/bool := false
+    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=MATH-OVERFLOW-ALERT-FLAG_ --offset=MATH-OVERFLOW-ALERT-OFFSET_) == 1: 
+      over = true
+    return over
 
   /** 
-  $set-conversion-ready --enable-alert-pin: Helpful alias for setting 'conversion-ready' on alert pin.
-  */
-  set-conversion-ready --enable-alert-pin -> none:
-    set-conversion-ready 1
+  $alert-limit: returns true if a set alert limit is exceeded.
 
-  /** 
-  $set-conversion-ready --disable-alert-pin: Helpful alias for setting 'conversion-ready' on alert pin.
+  While only one Alert Function can be monitored at the Alert pin at a 
+  time, the Conversion Ready can also be enabled to assert the Alert pin. Reading
+  the Alert Function Flag following an alert allows the user to determine if the
+  Alert Function is the source of the Alert.
+
+  When the Alert Latch Enable bit is set to Latch mode, the Alert Function Flag 
+  bit clears only when the Mask/Enable Register is read. When the Alert Latch 
+  Enable bit is set to Transparent mode, the Alert Function Flag bit is cleared
+  following the next conversion that does not result in an Alert condition.
   */
-  set-conversion-ready --disable-alert-pin -> none:
-    set-conversion-ready 0
+  alert-limit -> bool:
+    limit/bool := false
+    if (read-register_ --register=REGISTER-MASK-ENABLE_ --mask=FUNCTION-ALERT-FLAG_ --offset=FUNCTION-ALERT-OFFSET_) == 1: 
+      limit = true
+    return limit
 
   /**
   $get-conversion-time-us-from-enum: Returns microsecs for TIMING-x-US statics 0..7 (values as stored in the register).
@@ -647,17 +659,17 @@ class Ina226:
     sampling-rate/int         := get-sampling-rate-from-enum get-sampling-rate
     bus-conversion-time/int   := get-conversion-time-us-from-enum get-bus-conversion-time
     shunt-conversion-time/int := get-conversion-time-us-from-enum get-shunt-conversion-time
-    totalus/int               := (get-bus-conversion-time + get-shunt-conversion-time) * sampling-rate
+    total-us/int               := (bus-conversion-time + shunt-conversion-time) * sampling-rate
 
     // Add a small guard factor (~10%) to be conservative.
-    totalus = ((totalus * 11.0) / 10.0).round
+    total-us = ((total-us * 11.0) / 10.0).round
 
     // Return milliseconds, minimum 1 ms
-    totalms := ((totalus + 999) / 1000)  // Ceiling.
-    if totalms < 1: totalms = 1
+    total-ms := ((total-us + 999) / 1000)  // Ceiling.
+    if total-ms < 1: total-ms = 1
 
     //logger_.debug "get-estimated-conversion-time-ms is: $(totalms)ms"
-    return totalms
+    return total-ms
 
   /** 
   $read-manufacturer-id: Get Manufacturer identifier.
