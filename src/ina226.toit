@@ -40,120 +40,120 @@ class Ina226:
   
   Valid address values: 64 to 79 - See datasheet table 6-2
   */
-  static I2C-ADDRESS                     ::= 0x40
+  static I2C-ADDRESS                            ::= 0x40
 
   /** 
   MODE constants to be used by users during configuration with $set-measure-mode
   */
-  static MODE-POWER-DOWN                 ::= 0b000
-  static MODE-TRIGGERED                  ::= 0b011
-  static MODE-CONTINUOUS                 ::= 0b111 // Class Default.
+  static MODE-POWER-DOWN                       ::= 0b000
+  static MODE-TRIGGERED                        ::= 0b011
+  static MODE-CONTINUOUS                       ::= 0b111 // Class Default.
 
   /**
   Alert Types that can set off the alert register and/or alert pin. See $set-alert
   */
-  static ALERT-SHUNT-OVER-VOLTAGE        ::= 0x8000
-  static ALERT-SHUNT-UNDER-VOLTAGE       ::= 0x4000
-  static ALERT-BUS-OVER-VOLTAGE          ::= 0x2000
-  static ALERT-BUS-UNDER-VOLTAGE         ::= 0x1000
-  static ALERT-POWER-OVER                ::= 0x0800
-  static ALERT-CURRENT-OVER              ::= 0xFFFE
-  static ALERT-CURRENT-UNDER             ::= 0xFFFF
-  static ALERT-CONVERSION-READY          ::= 0x0400
+  static ALERT-SHUNT-OVER-VOLTAGE              ::= 0x8000
+  static ALERT-SHUNT-UNDER-VOLTAGE             ::= 0x4000
+  static ALERT-BUS-OVER-VOLTAGE                ::= 0x2000
+  static ALERT-BUS-UNDER-VOLTAGE               ::= 0x1000
+  static ALERT-POWER-OVER                      ::= 0x0800
+  static ALERT-CURRENT-OVER                    ::= 0xFFFE
+  static ALERT-CURRENT-UNDER                   ::= 0xFFFF
+  static ALERT-CONVERSION-READY                ::= 0x0400
 
   /** 
   Sampling options used for measurements. To be used with $set-sampling-rate
   */
-  static AVERAGE-1-SAMPLE                       ::= 0x00  // Chip Default - Values averaged over 1 sample.
-  static AVERAGE-4-SAMPLES                      ::= 0x01  // Values averaged over 4 samples.
-  static AVERAGE-16-SAMPLES                     ::= 0x02  // Values averaged over 16 samples.
-  static AVERAGE-64-SAMPLES                     ::= 0x03  // Values averaged over 64 samples.
-  static AVERAGE-128-SAMPLES                    ::= 0x04  // Values averaged over 128 samples.
-  static AVERAGE-256-SAMPLES                    ::= 0x05  // Values averaged over 256 samples.
-  static AVERAGE-512-SAMPLES                    ::= 0x06  // Values averaged over 512 samples.
-  static AVERAGE-1024-SAMPLES                   ::= 0x07  // Values averaged over 1024 samples.
+  static AVERAGE-1-SAMPLE                      ::= 0x00  // Chip Default - Values averaged over 1 sample.
+  static AVERAGE-4-SAMPLES                     ::= 0x01  // Values averaged over 4 samples.
+  static AVERAGE-16-SAMPLES                    ::= 0x02  // Values averaged over 16 samples.
+  static AVERAGE-64-SAMPLES                    ::= 0x03  // Values averaged over 64 samples.
+  static AVERAGE-128-SAMPLES                   ::= 0x04  // Values averaged over 128 samples.
+  static AVERAGE-256-SAMPLES                   ::= 0x05  // Values averaged over 256 samples.
+  static AVERAGE-512-SAMPLES                   ::= 0x06  // Values averaged over 512 samples.
+  static AVERAGE-1024-SAMPLES                  ::= 0x07  // Values averaged over 1024 samples.
 
   /** 
   Bus and Shunt conversion timing options. 
   
   To be used with $set-bus-conversion-time and $set-shunt-conversion-time
   */
-  static TIMING-140-US                   ::= 0x0000
-  static TIMING-204-US                   ::= 0x0001
-  static TIMING-332-US                   ::= 0x0002
-  static TIMING-588-US                   ::= 0x0003
-  static TIMING-1100-US                  ::= 0x0004 // Chip Default.
-  static TIMING-2100-US                  ::= 0x0005
-  static TIMING-4200-US                  ::= 0x0006
-  static TIMING-8300-US                  ::= 0x0007
+  static TIMING-140-US                         ::= 0x0000
+  static TIMING-204-US                         ::= 0x0001
+  static TIMING-332-US                         ::= 0x0002
+  static TIMING-588-US                         ::= 0x0003
+  static TIMING-1100-US                        ::= 0x0004 // Chip Default.
+  static TIMING-2100-US                        ::= 0x0005
+  static TIMING-4200-US                        ::= 0x0006
+  static TIMING-8300-US                        ::= 0x0007
 
   // Core Register Addresses.
-  static REGISTER-CONFIG_                ::= 0x00  //RW  // All-register reset, shunt voltage and bus voltage ADC conversion times and averaging, operating mode.
-  static REGISTER-SHUNT-VOLTAGE_         ::= 0x01  //R   // Shunt voltage measurement data.
-  static REGISTER-BUS-VOLTAGE_           ::= 0x02  //R   // Bus voltage measurement data.
-  static REGISTER-LOAD-POWER_            ::= 0x03  //R   // Value of the calculated power being delivered to the load.
-  static REGISTER-SHUNT-CURRENT_         ::= 0x04  //R   // Value of the calculated current flowing through the shunt resistor.
-  static REGISTER-CALIBRATION_           ::= 0x05  //RW  // Sets full-scale range and LSB of current and power measurements. Overall system calibration.
-  static REGISTER-MASK-ENABLE_           ::= 0x06  //RW  // Alert configuration and Conversion Ready flag.
-  static REGISTER-ALERT-LIMIT_           ::= 0x07  //RW  // Limit value to compare to the selected Alert function.
-  static REGISTER-MANUF-ID_              ::= 0xFE  //R   // Contains unique manufacturer identification number.
-  static REGISTER-DIE-ID_                ::= 0xFF  //R   // Contains unique die identification number.
+  static REGISTER-CONFIG_                      ::= 0x00  //RW  // All-register reset, shunt voltage and bus voltage ADC conversion times and averaging, operating mode.
+  static REGISTER-SHUNT-VOLTAGE_               ::= 0x01  //R   // Shunt voltage measurement data.
+  static REGISTER-BUS-VOLTAGE_                 ::= 0x02  //R   // Bus voltage measurement data.
+  static REGISTER-LOAD-POWER_                  ::= 0x03  //R   // Value of the calculated power being delivered to the load.
+  static REGISTER-SHUNT-CURRENT_               ::= 0x04  //R   // Value of the calculated current flowing through the shunt resistor.
+  static REGISTER-CALIBRATION_                 ::= 0x05  //RW  // Sets full-scale range and LSB of current and power measurements. Overall system calibration.
+  static REGISTER-MASK-ENABLE_                 ::= 0x06  //RW  // Alert configuration and Conversion Ready flag.
+  static REGISTER-ALERT-LIMIT_                 ::= 0x07  //RW  // Limit value to compare to the selected Alert function.
+  static REGISTER-MANUF-ID_                    ::= 0xFE  //R   // Contains unique manufacturer identification number.
+  static REGISTER-DIE-ID_                      ::= 0xFF  //R   // Contains unique die identification number.
 
   // Die & Manufacturer Info Masks
-  static DIE-ID-RID-MASK_                       ::= 0x000F //R  // Masks its part of the REGISTER-DIE-ID Register
-  static DIE-ID-RID-OFFSET_                     ::= 0
-  static DIE-ID-DID-MASK_                       ::= 0xFFF0 //R  // Masks its part of the REGISTER-DIE-ID Register
-  static DIE-ID-DID-OFFSET_                     ::= 4
+  static DIE-ID-RID-MASK_                      ::= 0x000F //R  // Masks its part of the REGISTER-DIE-ID Register
+  static DIE-ID-RID-OFFSET_                    ::= 0
+  static DIE-ID-DID-MASK_                      ::= 0xFFF0 //R  // Masks its part of the REGISTER-DIE-ID Register
+  static DIE-ID-DID-OFFSET_                    ::= 4
 
   // Actual INA226 device ID - to identify this chip over INA3221 etc.
-  static INA226-DEVICE-ID_               ::= 0x0226
+  static INA226-DEVICE-ID_                     ::= 0x0226
 
   // Configuration Register bitmasks.
-  static CONF-RESET-MASK_                ::= 0x8000
-  static CONF-RESET-OFFSET_              ::= 15
-  static CONF-AVERAGE-MASK_              ::= 0x0E00
-  static CONF-AVERAGE-OFFSET_            ::= 9
-  static CONF-SHUNTVC-MASK_              ::= 0x0038
-  static CONF-SHUNTVC-OFFSET_            ::= 3
-  static CONF-BUSVC-MASK_                ::= 0x01C0
-  static CONF-BUSVC-OFFSET_              ::= 6
-  static CONF-MODE-MASK_                 ::= 0x0007
-  static CONF-MODE-OFFSET_               ::= 0
+  static CONF-RESET-MASK_                      ::= 0x8000
+  static CONF-RESET-OFFSET_                    ::= 15
+  static CONF-AVERAGE-MASK_                    ::= 0x0E00
+  static CONF-AVERAGE-OFFSET_                  ::= 9
+  static CONF-SHUNTVC-MASK_                    ::= 0x0038
+  static CONF-SHUNTVC-OFFSET_                  ::= 3
+  static CONF-BUSVC-MASK_                      ::= 0x01C0
+  static CONF-BUSVC-OFFSET_                    ::= 6
+  static CONF-MODE-MASK_                       ::= 0x0007
+  static CONF-MODE-OFFSET_                     ::= 0
 
   //  Get Alert Flag.
-  static ALERT-CONVERSION-READY-FLAG_    ::= 0x0008
-  static ALERT-CONVERSION-READY-OFFSET_  ::= 3
-  static ALERT-CONVERSION-READY-LENGTH_  ::= 1
-  static ALERT-FUNCTION-FLAG_            ::= 0x0010
-  static ALERT-FUNCTION-OFFSET_          ::= 4
-  static ALERT-FUNCTION-LENGTH_          ::= 1
-  static ALERT-MATH-OVERFLOW-FLAG_       ::= 0x0004
-  static ALERT-MATH-OVERFLOW-OFFSET_     ::= 2
-  static ALERT-MATH-OVERFLOW-LENGTH_     ::= 1
-  static ALERT-PIN-POLARITY-BIT_         ::= 0x0002
-  static ALERT-PIN-POLARITY-OFFSET_      ::= 1
-  static ALERT-PIN-POLARITY-LENGTH_      ::= 1
-  static ALERT-LATCH-ENABLE-BIT_         ::= 0x0001
-  static ALERT-LATCH-ENABLE-OFFSET_      ::= 0
-  static ALERT-LATCH-ENABLE-LENGTH_      ::= 1
-  static CONVERSION-READY-BIT_           ::= 0x0800
-  static CONVERSION-READY-OFFSET_        ::= 11
-  static CONVERSION-READY-LENGTH_        ::= 1
+  static ALERT-CONVERSION-READY-FLAG_          ::= 0x0008
+  static ALERT-CONVERSION-READY-OFFSET_        ::= 3
+  static ALERT-CONVERSION-READY-LENGTH_        ::= 1
+  static ALERT-FUNCTION-FLAG_                  ::= 0x0010
+  static ALERT-FUNCTION-OFFSET_                ::= 4
+  static ALERT-FUNCTION-LENGTH_                ::= 1
+  static ALERT-MATH-OVERFLOW-FLAG_             ::= 0x0004
+  static ALERT-MATH-OVERFLOW-OFFSET_           ::= 2
+  static ALERT-MATH-OVERFLOW-LENGTH_           ::= 1
+  static ALERT-PIN-POLARITY-BIT_               ::= 0x0002
+  static ALERT-PIN-POLARITY-OFFSET_            ::= 1
+  static ALERT-PIN-POLARITY-LENGTH_            ::= 1
+  static ALERT-LATCH-ENABLE-BIT_               ::= 0x0001
+  static ALERT-LATCH-ENABLE-OFFSET_            ::= 0
+  static ALERT-LATCH-ENABLE-LENGTH_            ::= 1
+  static CONVERSION-READY-BIT_                 ::= 0x0800
+  static CONVERSION-READY-OFFSET_              ::= 11
+  static CONVERSION-READY-LENGTH_              ::= 1
 
   static INTERNAL_SCALING_VALUE_/float         ::= 0.00512
   static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.08192    // volts.
   static SHUNT-VOLTAGE-LSB_                    ::= 0.0000025  // volts. 2.5 µV/bit.
   static BUS-VOLTAGE-LSB_                      ::= 0.00125    // volts, 1.25 mV/bit
 
-  reg_/registers.Registers               := ?       // set by contsructor.
-  logger_/log.Logger                     := ?       // set by contsructor.
-  current-divider-ma_/float              := 0.0
-  power-multiplier-mw_/float             := 0.0
-  last-measure-mode_/int                 := MODE-CONTINUOUS
-  current-LSB_/float                     := 0.0
-  shunt-resistor_/float                  := 0.0
-  current-range_/float                   := 0.0
-  max-current_/float                     := 0.0
+  reg_/registers.Registers                     := ?       // set by contsructor.
+  logger_/log.Logger                           := ?       // set by contsructor.
+  current-divider-ma_/float                    := 0.0
+  power-multiplier-mw_/float                   := 0.0
+  last-measure-mode_/int                       := MODE-CONTINUOUS
+  current-LSB_/float                           := 0.0
+  shunt-resistor_/float                        := 0.0
+  current-range_/float                         := 0.0
+  max-current_/float                           := 0.0
   
   constructor dev/serial.Device --logger/log.Logger=(log.default.with-name "ina226"):
     logger_ = logger
@@ -192,8 +192,7 @@ class Ina226:
     set-shunt-resistor 0.100
     
     // Performing a single measurement during initialisation assists with accuracy for first reads.
-    trigger-measurement
-    wait-until-conversion-completed
+    trigger-measurement --wait=true
 
   /**
   $reset_: Reset Device.
@@ -416,7 +415,7 @@ class Ina226:
       sleep --ms=sleep-interval-ms
       current-wait-time-ms += sleep-interval-ms
       if current-wait-time-ms >= max-wait-time-ms:
-        logger_.debug "wait-until-conversion-completed: maxWaitTime $(max-wait-time-ms)ms exceeded - breaking"
+        logger_.debug "wait-until-conversion-completed: maxWaitTime $(max-wait-time-ms)ms exceeded - continuing"
         break
 
   /** 
@@ -651,10 +650,10 @@ class Ina226:
     totalus/int               := (get-bus-conversion-time + get-shunt-conversion-time) * sampling-rate
 
     // Add a small guard factor (~10%) to be conservative.
-    totalus = ((totalus * 11.0) / 10.0).to-int
+    totalus = ((totalus * 11.0) / 10.0).round
 
     // Return milliseconds, minimum 1 ms
-    totalms := ((totalus + 999) / 1000).to-int  // Ceiling.
+    totalms := ((totalus + 999) / 1000)  // Ceiling.
     if totalms < 1: totalms = 1
 
     //logger_.debug "get-estimated-conversion-time-ms is: $(totalms)ms"
@@ -745,17 +744,17 @@ class Ina226:
     shunt-voltage-delta-percent/float  := 0.0
     if supply-voltage > 0.0: shunt-voltage-delta-percent = (shunt-voltage-delta / supply-voltage) * 100.0
 
-    calibration-value/int            := get-calibration-value
-    current-raw/int                  := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
-    least-significant-bit/float      := 0.00512 / (calibration-value.to-float * shunt-resistor_)
-    current-chip/float               := current-raw * least-significant-bit
-    current-v-r/float                := shunt-voltage / shunt-resistor_
+    calibration-value/int              := get-calibration-value
+    current-raw/int                    := reg_.read-i16-be REGISTER-SHUNT-CURRENT_
+    least-significant-bit/float        := 0.00512 / (calibration-value.to-float * shunt-resistor_)
+    current-chip/float                 := current-raw * least-significant-bit
+    current-v-r/float                  := shunt-voltage / shunt-resistor_
 
     // CROSSCHECK: between chip/measured current and V/R reconstructed current.
-    current-difference/float         := (current-chip - current-v-r).abs
-    current-difference-percent/float := 0.0
+    current-difference/float           := (current-chip - current-v-r).abs
+    current-difference-percent/float   := 0.0
     if (current-v-r != 0.0): 
-      current-difference-percent      = (current-difference / current-v-r) * 100.0
+      current-difference-percent       = (current-difference / current-v-r) * 100.0
 
     // CROSSCHECK: shunt voltage (measured vs reconstructed).
     shunt-voltage-calculated/float          := current-chip * shunt-resistor_
