@@ -1,0 +1,5 @@
+prefixes:
+  ina226: ..
+packages:
+  ..:
+    path: ..
