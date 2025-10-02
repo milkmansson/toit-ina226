@@ -111,7 +111,9 @@ Use cases:
 ### Power-Down
 INA226 enters ultra-low-power state. No measurements happen. Supply current
 drops to 0.5 uA typ (2uA max). Useful for ultra-low power systems where periodic
-measurement isn't needed. Use `MODE-POWER-DOWN` or shortcut functions `set-power-off` or `set-power-on`, which return the drive to the previous state.
+measurement isn't needed. Use `set-measure-mode MODE-POWER-DOWN` to shutdown.
+Start again by setting the required measure mode using `set-measure-mode
+MODE-TRIGGERED` or `set-measure-mode MODE-CONTINUOUS`
 
 ### Mode Power Consumption
 
@@ -193,19 +195,27 @@ Additionally, it can be configured to trigger on 'conversion-ready', indicating
 that new data is available, useful especially in triggered mode.
 
 Only one alert function can be active at a time since the alert pin is shared.
-One configuration register allows a threshold to be set relative to the alert
-specified.  Alert latching can be configured using `set-alert-latching`, and
-alert pin poliarity using `set-alert-pin-polarity`.
-
-This driver clears other alerts when configuring a new one.  Configure a new alert using `set-xxx-alert` functions. When using:
+Therefore there is only one configuration register in the IC storing threshold
+information for the configured alert.  This driver takes care of these issues by
+clearing all other alerts when configuring a new one.  Configure the alert type
+using `set-xxx-alert` functions. When using:
 - Those requiring an alert value, this must be provided (in major SI units).
-- Given there is only one alert pin, only one function can be enabled at once. This driver clears other alert functions when setting a new one.
+- Given there is only one alert pin, only one function can be enabled at once.
 
 Because the alert mechanism is evaluated against the most recent ADC conversion,
 its response time is limited by the selected conversion times and averaging
 settings.  Longer averaging means more stable results but slower alerts.  This
 makes the Alert features most useful for catching sustained fault conditions (like
 over-current or brownout) rather than fast transients.
+
+### Alert Latching
+When the Alert Latch Enable bit is set to Transparent mode, the Alert pin and
+Flag bit resets to the idle states automatically when the fault has returned to
+normal.  However, when the Alert Latch Enable bit is set to Latch mode, the
+Alert pin and the Alert Flag bit will remains activated following a fault and stay that way until cleared manually.
+- Alert latching can be configured using `set-alert-latching`.
+- Clear alerts using `clear-alert`
+- Alert pin poliarity using `set-alert-pin-polarity`.
 
 ### Changing the Shunt Resistor
 Many cheap INA226 modules ship with 0.1 Ohm or 0.01 Ohm shunts.

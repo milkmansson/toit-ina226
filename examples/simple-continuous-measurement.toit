@@ -20,8 +20,8 @@ followed.  (Please see the Readme for pointers & guidance.) This example
 
 main:
   frequency := 400_000
-  sda := gpio.Pin 26
-  scl := gpio.Pin 25
+  sda := gpio.Pin 19
+  scl := gpio.Pin 20
   bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
 
   ina226-device := bus.device Ina226.I2C_ADDRESS

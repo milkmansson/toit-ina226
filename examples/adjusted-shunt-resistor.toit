@@ -36,11 +36,12 @@ Shunt Resistor (SR) | Max Measurable Current | Shunt Resistor   | Resolution per
 */
 
 main:
-  frequency := 400_000
-  sda := gpio.Pin 26
-  scl := gpio.Pin 25
-  bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
+  // Adjust these to pin numbers in your setup.
+  sda := gpio.Pin 19
+  scl := gpio.Pin 20
 
+  frequency := 400_000
+  bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
   ina226-device := bus.device Ina226.I2C_ADDRESS
 
   // Creates instance using an 0.010 Ohm shunt resistor
