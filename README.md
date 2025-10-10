@@ -59,7 +59,7 @@ Given their similarity, driver library for sibling models were written at the sa
 | **Alerting/Alert pin** | None. "Conversion Ready" exists, but must be checked in software. | Alerts and Alert Pin, but different features from INA3221. | Alerts and Alert pin, but different features from INA226  |
 | **Possible I2C addresses** | 16 | 16 | 4 |
 | **Datasheets** | [INA219 Datasheet](https://www.ti.com/lit/gpn/INA219) | [INA226 Datasheet](https://www.ti.com/lit/gpn/INA226) | [INA3221 Datasheet](https://www.ti.com/lit/ds/symlink/ina3221.pdf) |
-
+| **Other Notes** | - | - | Has no calibration register - current/power must be calculated in the driver.  Adds 'Power-Valid' window and Summation features.
 
 ## Core Concepts
 
@@ -187,20 +187,23 @@ From these, the driver computes current and power, and reconstructs the upstream
 supply.  On many boards, VBUS is often internally tied to IN− (the low side of the shunt).  If the module in use different (VBUS not tied to IN−), the meanings below
 still hold, although "bus voltage" would then refer to whatever is wired to VBUS.
 
-- **read-shunt-voltage:** The voltage drop across the shunt: Vshunt = IN+ − IN−.
-- **read-bus-voltage:** The "load node" voltage. If VBUS is not tied to IN−, the
-function returns whatever VBUS is wired to.
-- **read-supply-voltage:** The upstream/source voltage *before* the shunt
+- `read-shunt-voltage`: The voltage drop across the shunt: Vshunt = IN+ − IN−.
+  Given in Volts
+- `read-bus-voltage`: The "load node" voltage. If VBUS is not tied to IN−, the
+  function returns whatever VBUS is wired to.  Given in Volts.
+- `read-supply-voltage`: The upstream/source voltage *before* the shunt
 (Vsupply ≈ Vbus + Vshunt = (voltage at IN−) + (IN+ − IN−) = voltage at IN+.
-- **read-shunt-current:** The current through the shunt and load load, in amps.
+Given in Volts.
+- `read-shunt-current`: The current through the shunt and load load, in amps.
 Internally, the chip uses a calibration constant set from the configured shunt
-resistor value. Caveats:
+resistor value. Given in Amps. Caveats:
   - Accurate only if shunt value in code matches the physical shunt.
   - Choose appropriate averaging/conversion time for scenario.
-- **read-load-power:** Power delivered to the load, in watts. Caveats:
+- `read-load-power`: Power delivered to the load, in watts. Caveats:
   - Because Vbus is after the shunt, this approximates power at the load (not at
   the source).
-  - Depends on correct calibration.  (Calibration values are care of in this driver when setting `set-shunt-resistor`, and set to 0.100 Ohm by default).
+  - Depends on correct calibration.  (Calibration values are care of in this
+    driver when setting `set-shunt-resistor`, and set to 0.100 Ohm by default).
 
 ### Alerting
 The INA226 has alerts that both drive an external pin, whilst also being able to
@@ -245,29 +248,42 @@ increases sensitivity and resolution, but lowers the maximum measurable current
 the shunt. The INA226 cannot detect it, and the driver does not store these
 values permanently.
 
-Specifically: using the INA226’s shunt measurement specs:
-- Shunt voltage LSB = 2.5 uV
-- Shunt voltage max = ±81.92 mV
-
 ### Shunt Resistor Values
-Specifically: using the INA226’s shunt measurement specs....
-- Shunt voltage LSB = 2.5 uV
-- Shunt voltage max = ±81.92 mV
-
-....the following table illustrates consequences to current measurement with some sample shunt resistor values:
+The following table illustrates consequences to current measurement with some sample shunt resistor values:
 
 Shunt Resistor (SR) | Max Measurable Current | Shunt Resistor Wattage Requirement  | Resolution per bit | Note
---------------------|------------------------|------------------|--------------------|------------------------------------------
-1.000 Ohm	        | 81.92 mA               | 0.125w (min)     | 2.5 uA/bit         | Very fine resolution, only good for small currents (<0.1 A).
-0.100 Ohm (default) | 0.8192 A               | 0.125 W (min) 0.25 W (safer) | 25 uA/bit          | Middle ground; good for sub-amp measurements.
-0.050 Ohm           | 1.6384 A               | 0.25 W (min) 0.5 W (safer) | 50 uA/bit          | Wider range; 0.25 W resistor recommended, or higher for margin.
-0.010 Ohm           | 8.192 A                | 1 W (min) 2 W (preferred) | 250 uA/bit         | High range but coarser steps. Use ≥1 W shunt - mind heating & layout.
-
+-|-|-|-|-
+1.000 Ohm	| 81.92 mA | 0.125w (min) | 2.5 uA/bit | Very fine resolution, only good for small currents (<0.1 A).
+0.100 Ohm (default) | 0.8192 A | 0.125 W (min) 0.25 W (safer) | 25 uA/bit | Middle ground; good for sub-amp measurements.
+0.050 Ohm | 1.6384 A | 0.25 W (min) 0.5 W (safer) | 50 uA/bit | Wider range; 0.25 W resistor recommended, or higher for margin.
+0.010 Ohm | 8.192 A | 1 W (min) 2 W (preferred) | 250 uA/bit | High range but coarser steps. Use ≥1 W shunt - mind heating & layout.
 
 # About this library
 This library begun as a port of work originally done by Wolfgang Ewald
 <WEwald@gmx.de> and Originally published on
   [Github](https://github.com/wollewald/INA226_WE).
+
+## Issues
+If there are any issues, changes, or any other kind of feedback, please
+[raise an issue](toit-ina226/issues). Feedback is welcome and appreciated!
+
+## Disclaimer
+- This driver has been written and tested with an unbranded INA226 module.
+- All trademarks belong to their respective owners.
+- No warranties for this work, express or implied.
+
+## Credits
+- Wolfgang (Wolle) Ewald <WEwald@gmx.de> for the original code [published
+  here](https://github.com/wollewald/INA226_WE)
+  - https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor
+    (English)
+  - https://wolles-elektronikkiste.de/ina226 (German)
+- Rob Tillaart's work [here](https://github.com/RobTillaart/INA226) which helped
+  me understand and correct the work
+- AI has been used for code and text reviews, analysing and compiling data and
+  results, and assisting with ensuring accuracy.
+- [Florian](https://github.com/floitsch) for the tireless help and encouragement
+- The wider Toit developer team (past and present) for a truly excellent product
 
 ## About Toit
 One would assume you are here because you know what Toit is.  If you dont:
@@ -278,14 +294,3 @@ One would assume you are here because you know what Toit is.  If you dont:
 > ESP32. [[link](https://toitlang.org/)]
 - [Review on Soracom](https://soracom.io/blog/internet-of-microcontrollers-made-easy-with-toit-x-soracom/)
 - [Review on eeJournal](https://www.eejournal.com/article/its-time-to-get-toit)
-
-## Credits
-- Wolfgang (Wolle) Ewald <WEwald@gmx.de> for the original code [published
-  here](https://github.com/wollewald/INA226_WE)
-  - https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor
-    (English)
-  - https://wolles-elektronikkiste.de/ina226 (German)
-- Rob Tillaart's work [here](https://github.com/RobTillaart/INA226) which helped
-  me understand and correct the work
-- [Florian](https://github.com/floitsch) for the tireless help and encouragement
-- The wider Toit developer team (past and present) for a truly excellent product
