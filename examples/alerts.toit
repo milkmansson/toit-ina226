@@ -6,7 +6,6 @@ import gpio
 import i2c
 import ina226 show *
 
-
 /**
 Example: Alerts
 
@@ -21,8 +20,6 @@ the step
 4. for each iteration check the alarm went off
 
 */
-
-SHUNT-CURRENT-MAX ::= 1.638 //amps   // Theroetical maximum, not practical.
 
 main:
   frequency := 400_000
@@ -39,7 +36,6 @@ main:
   // Set initial state and enable channels.
   ina226-driver.set-measure-mode Ina226.MODE-CONTINUOUS
   // Setting these in case several different tests are run consecutively.
-  ina226-driver.set-power-on
 
   // Set reasonable average to ensure stable measurements.
   ina226-driver.set-sampling-rate Ina226.AVERAGE-16-SAMPLES
@@ -56,13 +52,17 @@ main:
   ina226-driver.trigger-measurement --wait
   test-target = ina226-driver.read-bus-voltage
 
+  state-string/string := ""
+  limit-string/string := ""
   10.repeat:
     ina226-driver.clear-alert
     current-test-value = test-target / 5 * it
     ina226-driver.set-bus-over-voltage-alert current-test-value
     sleep --ms=ina226-driver.get-estimated-conversion-time-ms
-    test-result = ina226-driver.alert-limit == true ? "ALERT" : "NORMAL"
-    print " Test #$it: $(current-state-as-string ina226-driver) - BUS-OVER-VOLT-ALERT: limit=$(%0.4f current-test-value) result = $(test-result)"
+    test-result = ina226-driver.is-alert-limit == true ? "ALERT" : "NORMAL"
+    state-string = current-state-as-string ina226-driver
+    limit-string = "$(%0.4f current-test-value)"
+    print " Test #$it: $state-string - BUS-OVER-VOLT-ALERT: limit=$limit-string result = $test-result"
   print
 
 
@@ -77,10 +77,11 @@ main:
     if current-test-value < 0.0 : current-test-value = 0.0
     ina226-driver.set-shunt-over-current-alert current-test-value
     sleep --ms=ina226-driver.get-estimated-conversion-time-ms
-    test-result = "$((ina226-driver.alert-limit == true) ? "ALERT" : "NORMAL")"
-    print " Test #$(it): $(current-state-as-string ina226-driver) - SHUNT-CURRENT-OVER-ALERT: limit=$(%0.6f current-test-value) result = $(test-result)"
+    test-result = "$((ina226-driver.is-alert-limit == true) ? "ALERT" : "NORMAL")"
+    state-string = current-state-as-string ina226-driver
+    limit-string = "$(%0.4f current-test-value)"
+    print " Test #$(it): $state-string - SHUNT-CURRENT-OVER-ALERT: limit=$limit-string result = $test-result"
   print
-
 
 current-state-as-string driver -> string:
   shunt-current-a/float  := driver.read-shunt-current
@@ -88,3 +89,5 @@ current-state-as-string driver -> string:
   bus-voltage-v/float    := driver.read-bus-voltage
   load-power-mw/float    := driver.read-load-power * 1000.0
   return "Shunt: $(%0.6f shunt-current-a)a  $(%0.3f shunt-voltage-mv)mv  Bus: $(%0.3f bus-voltage-v)v  Power: $(%0.1f load-power-mw)mw"
+
+

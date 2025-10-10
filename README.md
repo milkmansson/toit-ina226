@@ -1,4 +1,4 @@
-# Toit Library for a TI INA226 Voltage/Current Measurement Mmodule
+# Toit Library for a TI INA226 Voltage/Current Measurement Module
 Toit Driver Library for an INA226 module, DC Shunt Current, Voltage, and Power
 Monitor
 
@@ -8,11 +8,21 @@ The INA226 from Texas Instruments is a precision digital power monitor with an
  calculate current, monitors the bus voltage directly, and internally multiplies
  the two to report power consumption.
 
-Core features:
-- Measures shunt voltage (±81.92 mV) with 2.5 uV resolution.
-- Measures bus voltage (0 – 36 V) with 1.25 mV resolution.
-- Shunt voltage: 2.5 uV/LSB, full-scale ±81.92 mV.
-- Bus voltage: 1.25 mV/LSB, full-scale code = 40.96 V (but input must be ≤36 V).
+## Quick Start Information
+Use the following steps to get operational quickly:
+- Follow Wiring Diagrams to get the device connected correctly.
+- Ensure Toit is installed on the ESP32 and operating.  (Most of the code
+  examples require the use `jag monitor` to show outputs.)  See Toit
+  Documentation to [get started](https://docs.toit.io/getstarted).
+- This is a device using I2C, Toit documentation has a great [I2C
+  introduction](https://docs.toit.io/tutorials/hardware/i2c).
+- Use one of the code examples to see the driver in operation.
+
+## Core features:
+- Measures shunt voltage (±81.92 mV) with 2.5uv resolution.
+- Measures bus voltage (0 – 36 V) with 1.25mv resolution.
+- Shunt voltage: 2.5 uV/LSB, full-scale ±81.92mV.
+- Bus voltage: 1.25 mV/LSB, full-scale code = 40.96v (but input must be ≤36 V).
 - Computes current and power using a user-programmable shunt resistor value and
  calibration register (Current and Power are 0 until this is set.)
 - Independent conversion times for bus and shunt channels (140 us – 8.3 ms).
@@ -20,7 +30,7 @@ Core features:
 - I²C interface - Fast (≤400 kHz) and High-Speed mode up to 2.94 MHz
 - Built-in alert system for over/under-voltage, over-current, over-power, and
  conversion ready.
-- Operates from a single 2.7 – 5.5 V supply.
+- Operates from a single 2.7 – 5.5 vsupply.
 
 The INA226 device is cheap enough, and suited for power monitoring of small
  devices like microcontrollers, sensors, and IoT or embedded systems loads.
@@ -35,19 +45,29 @@ Further information can be found about this device here:
 
 There are several modules cheaply available based on this chipset.
 
+### Comparison of Sibling Models
+Given their similarity, driver library for sibling models were written at the same time:
+| Model | [**INA219**](https://github.com/milkmansson/toit-ina219)  | [**INA226**](https://github.com/milkmansson/toit-ina226/) (This driver)  | [**INA3221**](https://github.com/milkmansson/toit-ina3221/) |
+| ---- | ---- | ---- | ---- |
+| **Channels** | 1 | 1 | 3 (independent but require a common GND and other wiring caveats, see Datasheet.) |
+| **Bus/common-mode range** | 0–26 v(bus/common-mode). Bus register full-scale can be configured at 16v or 32v, with caveats (BRNG). | 0–36v common-mode. Bus register full-scale 40.96v but cannot exceed 36v at pins. | 0–26v common-mode; bus register full scale to 32.76v, but input cannot exceed 26v. |
+| **Shunt Voltage** | 320mv, depending on PGA config | +/-81.92mv fixed | 
+| **Device Voltage** | 3.0-5.5 v| 2.7-5.5v | 2.7-5.5v |
+| **Averaging options**  | 8 fixed options between 1 and 128.  Averaging and Conversion times are fixed to a limited set of pairs and cannot be set separately. | Several options between 1 and 1024.  All options available in combination with all conversion time options.  | Several options between 1 and 1024.  All options available in combination with all conversion time options. |
+| **Current & power registers** | Present (Requires device calibration, performed by the driver) | Present (Requires calibration, performed by the driver)  | Reports shunt & bus per channel but current and power are calulated in software by the driver. |
+| **ADC / resolution**  | 9 to 12-bit depending on the register, and averaging/ sampling option selected. | 16-bit | 13-bit |
+| **Alerting/Alert pin** | None. "Conversion Ready" exists, but must be checked in software. | Alerts and Alert Pin, but different features from INA3221. | Alerts and Alert pin, but different features from INA226  |
+| **Possible I2C addresses** | 16 | 16 | 4 |
 
-## Quick Start Information
-Use the following steps to get operational quickly:
-- Follow Wiring Diagrams to get the device connected correctly.
-- Ensure Toit is installed on the ESP32 and operating.  (Most of the code
-  examples require the use `jag monitor` to show outputs.)  See Toit
-  Documentation to [get started](https://docs.toit.io/getstarted).
-- This is a device using I2C, Toit documentation has a great [I2C
-  introduction](https://docs.toit.io/tutorials/hardware/i2c).
-- Use one of the code examples to see the driver in operation.
+
+Links:
+- [INA219 Datasheet](https://www.ti.com/lit/gpn/INA219)
+- [INA226 Datasheet](https://www.ti.com/lit/gpn/INA226)
+- [INA3221 Datasheet](https://www.ti.com/lit/ds/symlink/ina3221.pdf)
 
 
-# Core Concepts
+
+## Core Concepts
 
 ### "Shunt" History
 "Shunt" comes from the verb to shunt, meaning to divert or to bypass.  In
@@ -137,6 +157,7 @@ starts.)  Can also be instantiated directly into the required mode using
 ```Toit
   ina226-driver := Ina226 ina226-device --measure-mode=MODE-TRIGGERED
 ```
+Please see below for example resistor values.
 
 ### Sampling Rates
 The INA226 ADC can average samples together to lower noise and improve accuracy:
@@ -235,8 +256,13 @@ Specifically: using the INA226’s shunt measurement specs:
 - Shunt voltage max = ±81.92 mV
 
 ### Shunt Resistor Values
+Specifically: using the INA226’s shunt measurement specs....
+- Shunt voltage LSB = 2.5 uV
+- Shunt voltage max = ±81.92 mV
 
-Shunt Resistor (SR) | Max Measurable Current | Shunt Resistor Wattage Requirement  | Resolution per bit | Note:
+....the following table illustrates consequences to current measurement with some sample shunt resistor values:
+
+Shunt Resistor (SR) | Max Measurable Current | Shunt Resistor Wattage Requirement  | Resolution per bit | Note
 --------------------|------------------------|------------------|--------------------|------------------------------------------
 1.000 Ohm	        | 81.92 mA               | 0.125w (min)     | 2.5 uA/bit         | Very fine resolution, only good for small currents (<0.1 A).
 0.100 Ohm (default) | 0.8192 A               | 0.125 W (min) 0.25 W (safer) | 25 uA/bit          | Middle ground; good for sub-amp measurements.

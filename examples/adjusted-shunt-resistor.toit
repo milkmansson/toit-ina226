@@ -6,7 +6,8 @@ import gpio
 import i2c
 import ina226 show *
 
-/* Use Case: Changing the scale of currents measured
+/*
+Use Case: Changing the scale of currents measured
 
 If the task is to measure tiny standby or sleep currents (in the milliamp range) the default
 shunt resistor could be replaced with a larger value resistor (e.g. 1.0 ΩOhm).  This increases
@@ -14,25 +15,7 @@ the voltage drop per milliamp, giving the INA226 finer resolution for small load
 consequence is that the maximum measurable current shrinks to about 80 mA (since the INA226
 input saturates at appx 81.92 mV), and more power is dissipated in the shunt as heat.
 
-Specifically: using the INA226’s shunt measurement specs:
-- Shunt voltage LSB = 2.5 uV
-- Shunt voltage max = ±81.92 mV
-
-Shunt Resistor (SR) | Max Measurable Current | Shunt Resistor   | Resolution per bit | Note:
-                    |                        | Wattage Reqt     |                    |
---------------------|------------------------|------------------|--------------------|------------------------------------------
-1.000 Ohm	    | 81.92 mA               | 0.125w (min)     | 2.5 uA/bit         | Very fine resolution, only good for small
-                    |                        |                  |                    | currents (<0.1 A).
---------------------|------------------------|------------------|--------------------|------------------------------------------
-0.100 Ohm (default) | 0.8192 A               | 0.125 W (min)    | 25 uA/bit          | Middle ground; good for sub-amp
-                    |                        | 0.25 W (safe)    |                    | measurements.
---------------------|------------------------|------------------|--------------------|------------------------------------------
-0.050 Ohm           | 1.6384 A               | 0.25 W (min)     | 50 uA/bit          | Wider range; 0.25 W resistor recommended,
-                    |                        | 0.5 W (safe)     |                    | or higher for margin.
---------------------|------------------------|------------------|--------------------|------------------------------------------
-0.010 Ohm           | 8.192 A                | 1 W (min)        | 250 uA/bit         | High range but coarser steps. Use ≥1 W
-                    |                        | 2 W (preferred)  |                    | shunt - mind heating & layout.
---------------------|------------------------|------------------|--------------------|------------------------------------------
+Please see the README.md for example Shunt Resistor values.
 */
 
 main:
