@@ -72,16 +72,22 @@ Originally, in measurement circuits, shunt resistors were used in analog
 ammeters.  A sensitive meter with sensitive needle movement could only handle
 very tiny current.  A low-value "shunt" resistor was therefore placed in
 parallel to bypass (or shunt) most of the current, so the meter only saw a safe
-fraction.  By calibrating the ratio, read large currents could be read with a
+fraction.  By calibrating the ratio, large currents could be read with a
 small meter.
 
 ### How it works
-The INA226 measures current using a tiny precision resistor (referred to as the shunt resistor), which is placed in series with the load.  When current flows
-through the shunt, a small voltage develops across it.  Because the resistance is very low (e.g., 0.1 Ohm), this voltage is only a few millivolts even at significant currents. The INA226’s high-resolution ADC is designed to sense this tiny voltage drop, precision in the microvolt range.  Ohm’s Law (V = I × R) is used to compute current.
+The INA226 measures current using a tiny precision resistor (referred to as the
+shunt resistor), which is placed in series with the load.  When current flows
+through the shunt, a small voltage develops across it.  Because the resistance
+is very low (e.g., 0.1 Ohm), this voltage is only a few millivolts even at
+significant currents. The INA226’s high-resolution ADC is designed to sense this
+tiny voltage drop, precision in the microvolt range.  Ohm’s Law (V = I × R) is
+used to compute current.
 
 Simultaneously, the device monitors the bus voltage on the load side of the
 shunt. By combining the shunt voltage (for current) with the bus voltage (for
-supply level), the INA226 can also compute power consumption.  The INA226 stores these values in its registers which the driver retrieves using I2C.
+supply level), the INA226 can also compute power consumption.  The INA226 stores
+these values in its registers which the driver retrieves using I2C.
 
 # Usage
 
@@ -141,7 +147,9 @@ MODE-TRIGGERED` or `set-measure-mode MODE-CONTINUOUS`
 ## Features
 
 ### Shunt Resistor Configuration
-Most modules seen have R100 resistors onboard, so the driver has a default of 0.100 Ohm.  Set the shunt resistor to a different value when creating the instance (in Ohms) e.g.,
+Most modules seen have R100 resistors onboard, so the driver has a default of
+0.100 Ohm.  Set the shunt resistor to a different value when creating the
+instance (in Ohms) e.g.,
 ```Toit
   ina226-driver := Ina226 ina226-device --shunt-resistor=0.100
 ```
@@ -171,12 +179,21 @@ voltage.  Use `TIMING-xxx` statics with the `set-bus-conversion-time` and
 - Shorter time = fewer samples = faster updates, but noisier.
 
 ### Conversion Ready/Waiting time
-Although the registers can be read at any time, and the data from the last conversion is always available, the 'Conversion Ready Flag' is provided to help coordinate one-shot or triggered conversions.
+Although the registers can be read at any time, and the data from the last
+conversion is always available, the 'Conversion Ready Flag' is provided to help
+coordinate one-shot or triggered conversions.
 
-The driver calculates an 'estimated conversion time' using Shunt + Bus conversion times and sampling value, and adds a 10% margin.  This is used to compute a maximum wait time for a conversion before giving up.
+The driver calculates an 'estimated conversion time' using Shunt + Bus
+conversion times and sampling value, and adds a 10% margin.  This is used to
+compute a maximum wait time for a conversion before giving up.
 
-In triggered mode, if a measurement is triggered using `trigger-measurement`, it will wait for a maximum of `get-estimated-conversion-time-ms` for a conversion to complete.  If not using triggered mode, a fresh measurement can be triggered using
-`trigger-measurement` (optionally waiting by using the `--wait` flag.)  To manually wait for measurements in other scenarios, use `wait-until-conversion-completed` and override the default maximum wait time estimate using flag `--max-wait-time-ms=xxxx`.
+In triggered mode, if a measurement is triggered using `trigger-measurement`, it
+will wait for a maximum of `get-estimated-conversion-time-ms` for a conversion
+to complete.  If not using triggered mode, a fresh measurement can be triggered
+using `trigger-measurement` (optionally waiting by using the `--wait` flag.)  To
+manually wait for measurements in other scenarios, use
+`wait-until-conversion-completed` and override the default maximum wait time
+estimate using flag `--max-wait-time-ms=xxxx`.
 
 ### Measurement Functions
 The INA226 really measures two things internally:
@@ -236,7 +253,7 @@ Alert pin and the Alert Flag bit will remains activated following a fault and st
 - Alert pin poliarity using `set-alert-pin-polarity`.
 
 ### Changing the Shunt Resistor
-Many cheap INA226 modules ship with 0.1 Ohm or 0.01 Ohm shunts.
+Many INA226 modules ship with 0.1 Ohm or 0.01 Ohm shunts.
 - For high-current applications (tens of amps), the shunt can be replaced with a
   much smaller value (e.g. 1–5 mOhm). This reduces voltage drop and wasted power,
   and raises the maximum measurable current, but makes the resolution for tiny
@@ -244,9 +261,12 @@ Many cheap INA226 modules ship with 0.1 Ohm or 0.01 Ohm shunts.
 - For low-current applications (milliamps), a larger shunt (e.g. 0.5–1.0 Ohm)
 increases sensitivity and resolution, but lowers the maximum measurable current
 (≈80 mA with a 1 Ohm shunt) and burns more power in the resistor itself.
-**IMPORTANT:** Always update the calibration constant in the code after changing
-the shunt. The INA226 cannot detect it, and the driver does not store these
-values permanently.
+
+> [!IMPORTANT]
+> If the shunt is changed, always add a line to the beginning of the code to
+> set the shunt resistor value every boot.  The INA219 cannot detect it, and
+> the driver does not store these values permanently.
+
 
 ### Shunt Resistor Values
 The following table illustrates consequences to current measurement with some sample shunt resistor values:
