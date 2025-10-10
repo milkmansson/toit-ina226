@@ -33,12 +33,12 @@ main:
   ina226-driver.set-measure-mode Ina226.MODE-CONTINUOUS
 
   // Continuously read and display values, in one row:
-  shunt-current-ua/float := 0.0
-  bus-voltage/float      := 0.0
-  load-power-mw/float    := 0.0
+  shunt-current/float := 0.0
+  bus-voltage/float   := 0.0
+  load-power/float    := 0.0
   10.repeat:
-    shunt-current-ua = ina226-driver.read-shunt-current * 1000.0 * 1000.0
+    shunt-current = ina226-driver.read-shunt-current * 1000.0 * 1000.0
     bus-voltage = ina226-driver.read-bus-voltage
-    load-power-mw = ina226-driver.read-load-power * 1000
-    print "$(%0.1f shunt-current-ua)ua  $(%0.3f bus-voltage)v  $(%0.1f load-power-mw)mw"
+    load-power = ina226-driver.read-load-power * 1000
+    print "$(%0.1f shunt-current)ua  $(%0.3f bus-voltage)v  $(%0.1f load-power)mw"
     sleep --ms=500

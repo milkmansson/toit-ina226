@@ -51,20 +51,14 @@ Given their similarity, driver library for sibling models were written at the sa
 | ---- | ---- | ---- | ---- |
 | **Channels** | 1 | 1 | 3 (independent but require a common GND and other wiring caveats, see Datasheet.) |
 | **Bus/common-mode range** | 0–26 v(bus/common-mode). Bus register full-scale can be configured at 16v or 32v, with caveats (BRNG). | 0–36v common-mode. Bus register full-scale 40.96v but cannot exceed 36v at pins. | 0–26v common-mode; bus register full scale to 32.76v, but input cannot exceed 26v. |
-| **Shunt Voltage** | 320mv, depending on PGA config | +/-81.92mv fixed | 
+| **Shunt Voltage** | 320mv, depending on PGA config | +/-81.92mv fixed |
 | **Device Voltage** | 3.0-5.5 v| 2.7-5.5v | 2.7-5.5v |
 | **Averaging options**  | 8 fixed options between 1 and 128.  Averaging and Conversion times are fixed to a limited set of pairs and cannot be set separately. | Several options between 1 and 1024.  All options available in combination with all conversion time options.  | Several options between 1 and 1024.  All options available in combination with all conversion time options. |
 | **Current & power registers** | Present (Requires device calibration, performed by the driver) | Present (Requires calibration, performed by the driver)  | Reports shunt & bus per channel but current and power are calulated in software by the driver. |
 | **ADC / resolution**  | 9 to 12-bit depending on the register, and averaging/ sampling option selected. | 16-bit | 13-bit |
 | **Alerting/Alert pin** | None. "Conversion Ready" exists, but must be checked in software. | Alerts and Alert Pin, but different features from INA3221. | Alerts and Alert pin, but different features from INA226  |
 | **Possible I2C addresses** | 16 | 16 | 4 |
-
-
-Links:
-- [INA219 Datasheet](https://www.ti.com/lit/gpn/INA219)
-- [INA226 Datasheet](https://www.ti.com/lit/gpn/INA226)
-- [INA3221 Datasheet](https://www.ti.com/lit/ds/symlink/ina3221.pdf)
-
+| **Datasheets** | [INA219 Datasheet](https://www.ti.com/lit/gpn/INA219) | [INA226 Datasheet](https://www.ti.com/lit/gpn/INA226) | [INA3221 Datasheet](https://www.ti.com/lit/ds/symlink/ina3221.pdf) |
 
 
 ## Core Concepts
@@ -282,7 +276,7 @@ One would assume you are here because you know what Toit is.  If you dont:
 > iteration (live reloads over Wi-Fi in seconds), robust serviceability, and
 > performance that’s far closer to C than typical scripting options on the
 > ESP32. [[link](https://toitlang.org/)]
-- [Review on Soracom](https://soracom.io/blog/internet-of-microcontrollers-made-easy-with-toit-x-soracom/?utm_source=chatgpt.com)
+- [Review on Soracom](https://soracom.io/blog/internet-of-microcontrollers-made-easy-with-toit-x-soracom/)
 - [Review on eeJournal](https://www.eejournal.com/article/its-time-to-get-toit)
 
 ## Credits
