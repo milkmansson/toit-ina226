@@ -1,6 +1,8 @@
 # Toit Library for a TI INA226 Voltage/Current Measurement Module
 Toit Driver Library for an INA226 module, DC Shunt Current, Voltage, and Power
-Monitor
+Monitor.
+
+![Front and back of a INA226 module](images/ina226.jpg)
 
 ## About the Device
 The INA226 from Texas Instruments is a precision digital power monitor with an
