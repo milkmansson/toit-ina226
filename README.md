@@ -266,7 +266,7 @@ increases sensitivity and resolution, but lowers the maximum measurable current
 
 > [!IMPORTANT]
 > If the shunt is changed, always add a line to the beginning of the code to
-> set the shunt resistor value every boot.  The INA219 cannot detect it, and
+> set the shunt resistor value every boot.  The device cannot detect it, and
 > the driver does not store these values permanently.
 
 
