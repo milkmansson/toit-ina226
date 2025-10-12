@@ -287,7 +287,8 @@ This library begun as a port of work originally done by Wolfgang Ewald
 
 ## Issues
 If there are any issues, changes, or any other kind of feedback, please
-[raise an issue](toit-ina226/issues). Feedback is welcome and appreciated!
+[raise an issue](https://github.com/milkmansson/toit-ina226/issues). Feedback is
+welcome and appreciated!
 
 ## Disclaimer
 - This driver has been written and tested with an unbranded INA226 module.
