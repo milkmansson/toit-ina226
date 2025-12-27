@@ -210,12 +210,11 @@ still hold, although "bus voltage" would then refer to whatever is wired to VBUS
   Given in Volts
 - `read-bus-voltage`: The "load node" voltage. If VBUS is not tied to IN−, the
   function returns whatever VBUS is wired to.  Given in Volts.
-- `read-supply-voltage`: The upstream/source voltage *before* the shunt
-(Vsupply ≈ Vbus + Vshunt = (voltage at IN−) + (IN+ − IN−) = voltage at IN+.
-Given in Volts.
+- `read-supply-voltage`: The upstream/source voltage *before* the shunt (Vsupply
+  = Vbus + Vshunt = (voltage at IN−) + (IN+ − IN−) = voltage at IN+. Given in Volts.
 - `read-shunt-current`: The current through the shunt and load load, in amps.
-Internally, the chip uses a calibration constant set from the configured shunt
-resistor value. Given in Amps. Caveats:
+  Internally, the chip uses a calibration constant set from the configured shunt
+  resistor value. Given in Amps. See the tip below, and the following caveats:
   - Accurate only if shunt value in code matches the physical shunt.
   - Choose appropriate averaging/conversion time for scenario.
 - `read-load-power`: Power delivered to the load, in watts. Caveats:
@@ -223,6 +222,13 @@ resistor value. Given in Amps. Caveats:
   the source).
   - Depends on correct calibration.  (Calibration values are care of in this
     driver when setting `set-shunt-resistor`, and set to 0.100 Ohm by default).
+
+> [!TIP]
+> **On bus-voltage and supply-voltage:**  Some modules fix VBUS to IN- (load side), whereas
+> some are left for the user to decide where in the circuit to connect this pin.
+> If VBUS is connected to IN+ (supply-side) `read-supply-voltage` will not measure
+> accurately since the shunt drop will be added twice.
+
 
 ### Alerting
 The INA226 has alerts that both drive an external pin, whilst also being able to

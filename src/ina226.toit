@@ -12,13 +12,12 @@ import serial.registers as registers
 Toit Driver Library for an INA226 module, DC Shunt current and power sensor.
 
 Several common modules exist based on the TI INA226 chip.  Datasheet:
- https://www.ti.com/lit/ds/symlink/ina226.pdf One example:
- https://esphome.io/components/sensor/ina226/.  There are others with different
- feature sets and may be partially code compatible.  - For all sensor reads,
- values are floats, and supplied in base SI units: volts, amps and watts.  -
- get-* and set-* methods/functions are used for setting properties about the
- class or the sensor itself.  - read-* methods/functions are used for getting
- reading actual sensor values
+  https://www.ti.com/lit/ds/symlink/ina226.pdf One example:
+  https://esphome.io/components/sensor/ina226/.  There are others with different
+  feature sets and may be partially code compatible.
+  - For all sensor reads, values are floats, and supplied in base SI units: volts, amps and watts.
+  - get-* and set-* methods/functions are used for setting properties about the class or the sensor itself.
+  - read-* methods/functions are used for getting reading actual sensor values
 
 To use this library, consult the examples.
 */
@@ -193,11 +192,11 @@ class Ina226:
   Adjust Sampling Rate for measurements.
 
   The sampling rate determines how often the device samples and averages the
-   input signals (bus voltage and shunt voltage) before storing them in the
-   result registers.  More samples lead to more stable values, but can lengthen
-   the time required for a single measurement.  This is the register code/enum
-   value, not actual rate. Can be converted back using  $get-sampling-rate
-   --count={enum}
+    input signals (bus voltage and shunt voltage) before storing them in the
+    result registers.  More samples lead to more stable values, but can lengthen
+    the time required for a single measurement.  This is the register code/enum
+    value, not actual rate. Can be converted back using  $get-sampling-rate
+    --count={enum}
   */
   set-sampling-rate code/int -> none:
     write-register_ REG-CONFIG_ code --mask=CONF-AVERAGE-MASK_
@@ -214,7 +213,8 @@ class Ina226:
   Individual values are set for either the shunt or the bus voltage.
   - Longer time = more samples averaged inside = less noise, higher resolution.
   - Shorter time = fewer samples = faster updates, but noisier.
-  Both Bus and Shunt have separate conversion times
+
+  Both Bus and Shunt have separate conversion times:
   - Bus voltage = the "supply" or "load node" being monitored.
   - Shunt voltage = the tiny drop across the shunt resistor.
   - Current isn’t measured directly — it’s computed later from Vshunt/Rshunt.
@@ -252,7 +252,7 @@ class Ina226:
   Sets Measure Mode.
 
   One of $MODE-POWER-DOWN, $MODE-TRIGGERED or $MODE-CONTINUOUS. See section
-   6.6 of the Datasheet titled 'Electrical Characteristics'.
+    6.6 of the Datasheet titled 'Electrical Characteristics'.
   */
   set-measure-mode mode/int -> none:
     write-register_ REG-CONFIG_ mode --mask=CONF-MODE-MASK_
@@ -286,7 +286,7 @@ class Ina226:
   Returns shunt current in amps.
 
   The INA226 doesn't measure current directly—it measures the voltage drop
-   across this shunt resistor and calculates current using Ohm’s Law.
+    across this shunt resistor and calculates current using Ohm’s Law.
   */
   read-shunt-current -> float:
     value   := reg_.read-i16-be REG-SHUNT-CURRENT_
@@ -297,8 +297,8 @@ class Ina226:
   Returns shunt voltage in volts.
 
   The shunt voltage is the voltage drop across the shunt resistor, which allows
-   the INA226 to calculate current. The INA226 measures this voltage to
-   calculate the current flowing through the load.
+    the INA226 to calculate current. The INA226 measures this voltage to
+    calculate the current flowing through the load.
   */
   read-shunt-voltage -> float:
     value := reg_.read-i16-be REG-SHUNT-VOLTAGE_
@@ -307,10 +307,10 @@ class Ina226:
   /**
   Returns upstream voltage, before the shunt (IN+).
 
-  This is the rail straight from the power source, minus any drop across the
-   shunt. Since INA226 doesn’t have a dedicated pin for this, it can be
-   reconstructed by: Vsupply = Vbus + Vshunt.  i.e. adding the measured bus
-   voltage (load side) and the measured shunt voltage.
+  This is the rail straight from the power source. Since INA226 doesn’t have a
+    dedicated pin for this, it can be reconstructed by: Vsupply = Vbus + Vshunt.
+    i.e. adding the measured bus voltage (load side) and the measured shunt
+    voltage.
   */
   read-supply-voltage -> float:
     return read-bus-voltage + read-shunt-voltage
@@ -319,11 +319,15 @@ class Ina226:
   Return voltage of whatever is wired to the VBUS pin.
 
   On most breakout boards, VBUS is tied internally to IN− (the low side of the
-   shunt). So in practice, “bus voltage” usually means the voltage at the load
-   side of the shunt.  This is what the load actually sees as its supply rail.
+    shunt). So in practice, "bus voltage" usually means the voltage at the load
+    side of the shunt.  This is what the load actually sees as its supply rail.
+
+  If the breakout board does not have VBUS tied to IN-, and instead it is
+    connected by the user to IN+ (Load Side), the value will be incorrect as the
+    shunt voltage will be added twice.
   */
   read-bus-voltage -> float:
-    value := reg_.read-i16-be REG-BUS-VOLTAGE_
+    value := reg_.read-u16-be REG-BUS-VOLTAGE_
     return value * BUS-VOLTAGE-LSB_
 
   /**
@@ -354,10 +358,11 @@ class Ina226:
   Performs a single conversion/measurement.
 
   If in $MODE_TRIGGERED:  Executes one measurement.
+
   If in $MODE_CONTINUOUS: Immediately refreshes data.
 
   If $wait is set, waits until the conversion is done. By default $wait is
-   true if in $MODE-TRIGGERED.
+    true if in $MODE-TRIGGERED.
   */
   trigger-measurement --wait/bool=(get-measure-mode == MODE-TRIGGERED) -> none:
 
@@ -373,6 +378,7 @@ class Ina226:
 
   /**
   Sets shunt 'is over voltage' alert.
+
   See README.md.
   */
   set-shunt-over-voltage-alert limit/float -> none:
@@ -383,6 +389,7 @@ class Ina226:
 
   /**
   Sets shunt 'is under voltage' alert.
+
   See README.md.
   */
   set-shunt-under-voltage-alert limit/float -> none:
@@ -393,6 +400,7 @@ class Ina226:
 
   /**
   Sets shunt 'is over current' alert by mathing to voltage.
+
   See README.md.
   */
   set-shunt-over-current-alert amps/float -> none:
@@ -408,6 +416,7 @@ class Ina226:
 
   /**
   Sets shunt 'is under current' alert by mathing to voltage.
+
   See README.md.
   */
   set-shunt-under-current-alert amps/float -> none:
@@ -423,6 +432,7 @@ class Ina226:
 
   /**
   Sets bus 'is over voltage' alert.
+
   See README.md.
   */
   set-bus-over-voltage-alert volts/float -> none:
@@ -433,6 +443,7 @@ class Ina226:
 
   /**
   Sets bus 'is under voltage' alert.
+
   See README.md.
   */
   set-bus-under-voltage-alert volts/float -> none:
@@ -443,6 +454,7 @@ class Ina226:
 
   /**
   Sets power 'is over wattage' alert.
+
   See README.md.
   */
   set-power-over-alert watts/float -> none:
@@ -513,10 +525,11 @@ class Ina226:
   Returns whether a conversion is complete.
 
   Although the device can be read at any time, and the data from the last
-   conversion is available, the Conversion Ready Flag bit is provided to help
-   coordinate one-shot or triggered conversions. The Conversion Ready Flag bit
-   is set after all conversions, averaging, and multiplications are complete.
-   Conversion Ready Flag bit clears under the following conditions:
+    conversion is available, the Conversion Ready Flag bit is provided to help
+    coordinate one-shot or triggered conversions. The Conversion Ready Flag bit
+    is set after all conversions, averaging, and multiplications are complete.
+    Conversion Ready Flag bit clears under the following conditions:
+
     1. Writing to the Configuration Register (except when Power-Down).
     2. Reading the Mask/Enable Register (Implemented in $clear-alert).
   */
@@ -533,6 +546,7 @@ class Ina226:
 
   /**
   Whether the configured alert limits are exceeded.
+
   See README.md.
   */
   is-alert-limit -> bool:
@@ -573,7 +587,7 @@ class Ina226:
   Estimates a worst-case maximum waiting time (+10%) based on the configuration.
 
   Done this way to prevent setting a max-wait type value of the worst case
-   situation for all situations.
+    situation for all situations.
   */
   get-estimated-conversion-time-ms -> int:
     // Read config and decode fields using masks/offsets
@@ -616,7 +630,7 @@ class Ina226:
   Given that register reads are largely similar, implemented here.
 
   If the mask is left at 0xFFFF and offset at 0x0, it is treated as a read from
-   the whole register.
+    the whole register.
   */
   read-register_ register/int --mask/int=0xFFFF --offset/int=(mask.count-trailing-zeros) -> any:
     raw-value := reg_.read-u16-be register
@@ -632,8 +646,8 @@ class Ina226:
   Writes the given register with the supplied mask.
 
   Given that register writes are largely similar, it is implemented here.  If
-   the mask is left at 0xFFFF and offset at 0x0, it is treated as a write to the
-   whole register.
+    the mask is left at 0xFFFF and offset at 0x0, it is treated as a write to
+    the whole register.
   */
   write-register_ register/int value/any --mask/int=0xFFFF --offset/int=(mask.count-trailing-zeros) -> none:
     // find allowed value range within field
@@ -661,8 +675,8 @@ class Ina226:
   Print Diagnostic Information.
 
   Prints relevant measurement information allowing someone with a Voltmeter to
-   double check what is measured and compare it.  Also tries to self-check a
-   little by calculating/comparing using Ohms Law (V=I*R).
+    double check what is measured and compare it.  Also tries to self-check a
+    little by calculating/comparing using Ohms Law (V=I*R).
   */
   print-diagnostics -> none:
     // Optional: ensure fresh data.
