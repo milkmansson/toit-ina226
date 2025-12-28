@@ -288,7 +288,7 @@ Shunt Resistor (SR) | Max Measurable Current | Shunt Resistor Wattage Requiremen
 
 # About this library
 This library begun as a port of work originally done by Wolfgang Ewald
-<WEwald@gmx.de> and Originally published on
+<WEwald@gmx.de> and originally published on
   [Github](https://github.com/wollewald/INA226_WE).
 
 ## Issues
