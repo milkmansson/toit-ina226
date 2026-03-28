@@ -21,6 +21,7 @@ Several common modules exist based on the TI INA226 chip.  Datasheet:
 
 To use this library, consult the examples.
 */
+
 class Ina226:
   /**
   Default $I2C-ADDRESS is 64 (0x40).  Valid addresses: 64 to 79.  See Datasheet.
@@ -115,7 +116,7 @@ class Ina226:
   static CONF-MODE-MASK_                       ::= 0b00000000_00000111
 
   static INTERNAL_SCALING_VALUE_/float         ::= 0.00512
-  static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.08192    // volts.
+  static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.0819175  // or 0.08192    // volts.
   static SHUNT-VOLTAGE-LSB_                    ::= 0.0000025  // volts. 2.5 µV/bit.
   static BUS-VOLTAGE-LSB_                      ::= 0.00125    // volts, 1.25 mV/bit
 
@@ -344,6 +345,17 @@ class Ina226:
   Waits for 'conversion-ready', with a maximum wait of $get-estimated-conversion-time-ms.
   */
   wait-until-conversion-completed --max-wait-time-ms/int=(get-estimated-conversion-time-ms) -> none:
+    sleep-interval-ms := max 1 (max-wait-time-ms / 10)
+    exception := catch:
+      with-timeout --ms=max-wait-time-ms:
+        while not is-conversion-ready:
+          sleep --ms=sleep-interval-ms
+    if exception:
+      logger_.debug "wait-until-conversion-completed: max-wait-time exceeded - continuing"
+          --tags={ "max-wait-time-ms" : max-wait-time-ms }
+    clear-alert
+  /*
+  wait-until-conversion-completed --max-wait-time-ms/int=(get-estimated-conversion-time-ms) -> none:
     current-wait-time-ms/int   := 0
     sleep-interval-ms/int := (max-wait-time-ms / 10)
     while (not is-conversion-ready):
@@ -354,13 +366,14 @@ class Ina226:
           --tags={ "max-wait-time-ms" : max-wait-time-ms }
         break
     clear-alert
+  */
 
   /**
   Performs a single conversion/measurement.
 
-  If in $MODE_TRIGGERED:  Executes one measurement.
+  If in $MODE-TRIGGERED:  Executes one measurement.
 
-  If in $MODE_CONTINUOUS: Immediately refreshes data.
+  If in $MODE-CONTINUOUS: Immediately refreshes data.
 
   If $wait is set, waits until the conversion is done. By default $wait is
     true if in $MODE-TRIGGERED.
@@ -475,13 +488,24 @@ class Ina226:
   /**
   Disables all alerts.  Useful when setting a new alert type.
   */
+  //disable-all-alerts -> none:
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-OVER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-UNDER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-POWER-OVER_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-CONVERSION-READY_
   disable-all-alerts -> none:
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-OVER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-UNDER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-POWER-OVER_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-CONVERSION-READY_
+    alert-mask := ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
+        | ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
+        | ALERT-ENABLE-BUS-OVER-VOLTAGE_
+        | ALERT-ENABLE-BUS-UNDER-VOLTAGE_
+        | ALERT-ENABLE-POWER-OVER_
+        | ALERT-ENABLE-CONVERSION-READY_
+    raw := reg_.read-u16-be REG-MASK-ENABLE_
+    raw &= ~alert-mask
+    reg_.write-u16-be REG-MASK-ENABLE_ raw
+
 
   /**
   Sets Alert "Latching".
@@ -493,9 +517,9 @@ class Ina226:
    - 1 = Latch enabled
    - 0 = Transparent (default)
   */
-  set-alert-latching set/int -> none:
-    assert: 0 <= set <= 1
-    write-register_ REG-MASK-ENABLE_ set --mask=ALERT-LATCH-ENABLE_
+  set-alert-latching value/int -> none:
+    assert: 0 <= value <= 1
+    write-register_ REG-MASK-ENABLE_ value --mask=ALERT-LATCH-ENABLE_
 
   /**
   Sets alert pin polarity function.
@@ -504,9 +528,9 @@ class Ina226:
   - 1 = Inverted (active-high open collector).
   - 0 = Normal (active-low open collector) (default).
   */
-  set-alert-pin-polarity set/int -> none:
-    assert: 0 <= set <= 1
-    write-register_ REG-MASK-ENABLE_ set --mask=ALERT-PIN-POLARITY_
+  set-alert-pin-polarity polarity/int -> none:
+    assert: 0 <= polarity <= 1
+    write-register_ REG-MASK-ENABLE_ polarity --mask=ALERT-PIN-POLARITY_
 
   /**
   Gets configured alert pin polarity setting. See '$set-alert-pin-polarity'.
@@ -667,7 +691,7 @@ class Ina226:
   /**
   Clamps the supplied value to specified limit.
   */
-  clamp-value_ value/any --upper/any?=null --lower/any?=null -> any:
+  clamp-value_ value/int --upper/int?=null --lower/int?=null -> int:
     if upper != null: if value > upper:  return upper
     if lower != null: if value < lower:  return lower
     return value
