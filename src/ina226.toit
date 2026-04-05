@@ -21,6 +21,7 @@ Several common modules exist based on the TI INA226 chip.  Datasheet:
 
 To use this library, consult the examples.
 */
+
 class Ina226:
   /**
   Default $I2C-ADDRESS is 64 (0x40).  Valid addresses: 64 to 79.  See Datasheet.
@@ -103,8 +104,9 @@ class Ina226:
   static DIE-ID-RID-MASK_                      ::= 0b00000000_00001111
   static DIE-ID-DID-MASK_                      ::= 0b11111111_11110000
 
-  // Actual INA226 device ID - to identify this chip over INA3221 etc.
-  static INA226-DEVICE-ID_                     ::= 0x0226
+  // Actual INA226 device ID field - to identify this chip over INA3221 etc.
+  // DIE-ID register (bits [15:4] of 0x2260, after masking and shifting).
+  static INA226-DEVICE-ID_                     ::= 0x226
 
   // Configuration Register bitmasks.
   static CONF-RESET-MASK_                      ::= 0b10000000_00000000
@@ -114,15 +116,15 @@ class Ina226:
   static CONF-MODE-MASK_                       ::= 0b00000000_00000111
 
   static INTERNAL_SCALING_VALUE_/float         ::= 0.00512
-  static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.08192    // volts.
+  static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.0819175  // or 0.08192    // volts.
   static SHUNT-VOLTAGE-LSB_                    ::= 0.0000025  // volts. 2.5 µV/bit.
   static BUS-VOLTAGE-LSB_                      ::= 0.00125    // volts, 1.25 mV/bit
 
   // Private variables.
   reg_/registers.Registers := ?
   logger_/log.Logger := ?
-  current-divider-ma_/float := 0.0
-  power-multiplier-mw_/float := 0.0
+  //current-divider-ma_/float := 0.0
+  power-LSB_/float := 0.0
   current-LSB_/float := 0.0
   shunt-resistor_/float := 0.0
   current-range_/float := 0.0
@@ -136,7 +138,6 @@ class Ina226:
     logger_ = logger.with-name "ina226"
     reg_ = dev.registers
     shunt-resistor_ = shunt-resistor
-    set-measure-mode measure-mode
 
     dev-id := read-device-identification
     man-id := read-manufacturer-id
@@ -146,15 +147,15 @@ class Ina226:
       logger_.error "Device is NOT an INA226" --tags={ "expected-id" : INA226-DEVICE-ID_, "received-id": dev-id }
       throw "Device is not an INA226. Expected 0x$(%04x INA226-DEVICE-ID_) got 0x$(%04x dev-id)"
 
-    // Maybe not required but the manual suggests it should be done.
-    reset_
+    // Reset first, then configure everything on a clean slate.
+    write-register_ REG-CONFIG_ 0b1 --mask=CONF-RESET-MASK_
 
-    // Initialize Default sampling, conversion timing, and measuring mode.
+    set-shunt-resistor_ shunt-resistor_
+    set-measure-mode measure-mode
     set-sampling-rate AVERAGE-1-SAMPLE
     set-bus-conversion-time TIMING-1100-US
     set-shunt-conversion-time TIMING-1100-US
 
-    // Performing a single measurement during initialisation assists with accuracy for first reads.
     trigger-measurement --wait
 
   /**
@@ -278,9 +279,9 @@ class Ina226:
     // Set the new calibration value in the IC.
     set-calibration-value_  (new-calibration-value).round
     // Cache new current divider LSB
-    current-divider-ma_    = 0.001 / current-LSB_
+    //current-divider-ma_    = 0.001 / current-LSB_
     // Cache new power multiplier/LSB
-    power-multiplier-mw_   = 1000.0 * 25.0 * current-LSB_
+    power-LSB_   = 25.0 * current-LSB_
 
   /**
   Returns shunt current in amps.
@@ -333,15 +334,27 @@ class Ina226:
   /**
   Watts used by the load.
 
-  Calculated using the cached multiplier: [power-multiplier-mw_ = 1000 * 25 * current-LSB_]
+  Calculated using the cached multiplier: [power-LSB_ = 1000 * 25 * current-LSB_]
   */
   read-load-power -> float:
     value := reg_.read-u16-be REG-LOAD-POWER_
-    return (value * power-multiplier-mw_).to-float / 1000.0
+    //return (value * power-LSB_).to-float / 1000.0
+    return value * power-LSB_
 
   /**
   Waits for 'conversion-ready', with a maximum wait of $get-estimated-conversion-time-ms.
   */
+  wait-until-conversion-completed --max-wait-time-ms/int=(get-estimated-conversion-time-ms) -> none:
+    sleep-interval-ms := max 1 (max-wait-time-ms / 10)
+    exception := catch:
+      with-timeout --ms=max-wait-time-ms:
+        while not is-conversion-ready:
+          sleep --ms=sleep-interval-ms
+    if exception:
+      logger_.debug "wait-until-conversion-completed: max-wait-time exceeded - continuing"
+          --tags={ "max-wait-time-ms" : max-wait-time-ms }
+    clear-alert
+  /*
   wait-until-conversion-completed --max-wait-time-ms/int=(get-estimated-conversion-time-ms) -> none:
     current-wait-time-ms/int   := 0
     sleep-interval-ms/int := (max-wait-time-ms / 10)
@@ -353,13 +366,14 @@ class Ina226:
           --tags={ "max-wait-time-ms" : max-wait-time-ms }
         break
     clear-alert
+  */
 
   /**
   Performs a single conversion/measurement.
 
-  If in $MODE_TRIGGERED:  Executes one measurement.
+  If in $MODE-TRIGGERED:  Executes one measurement.
 
-  If in $MODE_CONTINUOUS: Immediately refreshes data.
+  If in $MODE-CONTINUOUS: Immediately refreshes data.
 
   If $wait is set, waits until the conversion is done. By default $wait is
     true if in $MODE-TRIGGERED.
@@ -371,7 +385,7 @@ class Ina226:
 
     // Rewriting the mode bits starts a conversion.
     raw := read-register_ REG-CONFIG_ --mask=CONF-MODE-MASK_
-    write-register_ REG-MASK-ENABLE_ raw --mask=CONF-MODE-MASK_
+    write-register_ REG-CONFIG_ raw --mask=CONF-MODE-MASK_
 
     // Wait if required. If in triggered mode, wait by default, respect switch.
     if wait: wait-until-conversion-completed
@@ -459,8 +473,8 @@ class Ina226:
   */
   set-power-over-alert watts/float -> none:
     disable-all-alerts
-    //raw-limit/int := (limit / power-multiplier-mw_).round
-    raw-limit/int := (watts / (25 * current_LSB_)).round
+    //raw-limit/int := (limit / power-LSB_).round
+    raw-limit/int := (watts / (25 * current-LSB_)).round
     write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-POWER-OVER_
     write-register_ REG-ALERT-LIMIT_ raw-limit
 
@@ -474,13 +488,24 @@ class Ina226:
   /**
   Disables all alerts.  Useful when setting a new alert type.
   */
+  //disable-all-alerts -> none:
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-OVER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-UNDER-VOLTAGE_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-POWER-OVER_
+  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-CONVERSION-READY_
   disable-all-alerts -> none:
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-OVER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-UNDER-VOLTAGE_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-POWER-OVER_
-    write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-CONVERSION-READY_
+    alert-mask := ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
+        | ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
+        | ALERT-ENABLE-BUS-OVER-VOLTAGE_
+        | ALERT-ENABLE-BUS-UNDER-VOLTAGE_
+        | ALERT-ENABLE-POWER-OVER_
+        | ALERT-ENABLE-CONVERSION-READY_
+    raw := reg_.read-u16-be REG-MASK-ENABLE_
+    raw &= ~alert-mask
+    reg_.write-u16-be REG-MASK-ENABLE_ raw
+
 
   /**
   Sets Alert "Latching".
@@ -492,9 +517,9 @@ class Ina226:
    - 1 = Latch enabled
    - 0 = Transparent (default)
   */
-  set-alert-latching set/int -> none:
-    assert: 0 <= set <= 1
-    write-register_ REG-MASK-ENABLE_ set --mask=ALERT-LATCH-ENABLE_
+  set-alert-latching value/int -> none:
+    assert: 0 <= value <= 1
+    write-register_ REG-MASK-ENABLE_ value --mask=ALERT-LATCH-ENABLE_
 
   /**
   Sets alert pin polarity function.
@@ -503,9 +528,9 @@ class Ina226:
   - 1 = Inverted (active-high open collector).
   - 0 = Normal (active-low open collector) (default).
   */
-  set-alert-pin-polarity set/int -> none:
-    assert: 0 <= set <= 1
-    write-register_ REG-MASK-ENABLE_ set --mask=ALERT-PIN-POLARITY_
+  set-alert-pin-polarity polarity/int -> none:
+    assert: 0 <= polarity <= 1
+    write-register_ REG-MASK-ENABLE_ polarity --mask=ALERT-PIN-POLARITY_
 
   /**
   Gets configured alert pin polarity setting. See '$set-alert-pin-polarity'.
@@ -550,7 +575,7 @@ class Ina226:
   See README.md.
   */
   is-alert-limit -> bool:
-    raw/bool := read-register_ REG-MASK-ENABLE_ --mask=FUNCTION-ALERT-FLAG_
+    raw/int := read-register_ REG-MASK-ENABLE_ --mask=FUNCTION-ALERT-FLAG_
     return raw == 1
 
   /**
@@ -558,15 +583,16 @@ class Ina226:
   */
   get-conversion-time-us-from-enum code/int -> int:
     assert: 0 <= code <= 7
-    if code == TIMING-140-US:  return 140
-    if code == TIMING-204-US:  return 204
-    if code == TIMING-332-US:  return 332
-    if code == TIMING-588-US:  return 588
-    if code == TIMING-1100-US: return 1100
-    if code == TIMING-2100-US: return 2100
-    if code == TIMING-4200-US: return 4200
-    if code == TIMING-8300-US: return 8300
-    return 1100  // default/defensive - should never happen
+    // Using datasheet maximum values, not typical.
+    if code == TIMING-140-US:  return 154
+    if code == TIMING-204-US:  return 224
+    if code == TIMING-332-US:  return 365
+    if code == TIMING-588-US:  return 646
+    if code == TIMING-1100-US: return 1210
+    if code == TIMING-2100-US: return 2328
+    if code == TIMING-4200-US: return 4572
+    if code == TIMING-8300-US: return 9068
+    return 1210
 
   /**
   Returns sampling count for AVERAGE-*-SAMPLE register values.
@@ -596,12 +622,12 @@ class Ina226:
     shunt-conversion-time/int := get-conversion-time-us-from-enum get-shunt-conversion-time
     total-us/int              := (bus-conversion-time + shunt-conversion-time) * sampling-rate
 
-    // Add a small guard factor (~10%) to be conservative.
-    total-us = ((total-us * 11.0) / 10.0).round
+    // Add 25% guard factor.
+    total-us = ((total-us * 5) / 4)
 
-    // Return milliseconds, minimum 1 ms
-    total-ms := ((total-us + 999) / 1000)  // Ceiling.
-    if total-ms < 1: total-ms = 1
+    // Minimum 5ms floor to account for I2C polling overhead (@100khz worst).
+    total-ms := ((total-us + 999) / 1000)
+    if total-ms < 5: total-ms = 5
 
     //logger_.debug "get-estimated-conversion-time-ms:"  --tags={ "get-estimated-conversion-time-ms" : total-ms }
     return total-ms
@@ -666,7 +692,7 @@ class Ina226:
   /**
   Clamps the supplied value to specified limit.
   */
-  clamp-value_ value/any --upper/any?=null --lower/any?=null -> any:
+  clamp-value_ value/int --upper/int?=null --lower/int?=null -> int:
     if upper != null: if value > upper:  return upper
     if lower != null: if value < lower:  return lower
     return value

@@ -83,8 +83,8 @@ main:
   this-voltage := 0.0
 
   frequency := 400_000
-  sda := gpio.Pin 26
-  scl := gpio.Pin 25
+  sda := gpio.Pin 19
+  scl := gpio.Pin 20
   bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
   scandevices := bus.scan
 
