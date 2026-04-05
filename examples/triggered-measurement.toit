@@ -18,8 +18,8 @@ This use case is relevant where a balance is required between Update Speed and
 
 main:
   frequency := 400_000
-  sda   := gpio.Pin 26
-  scl   := gpio.Pin 25
+  sda := gpio.Pin 19
+  scl := gpio.Pin 20
   bus   := i2c.Bus --sda=sda --scl=scl --frequency=frequency
   event := 0
 

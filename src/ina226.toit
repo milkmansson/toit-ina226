@@ -583,15 +583,16 @@ class Ina226:
   */
   get-conversion-time-us-from-enum code/int -> int:
     assert: 0 <= code <= 7
-    if code == TIMING-140-US:  return 140
-    if code == TIMING-204-US:  return 204
-    if code == TIMING-332-US:  return 332
-    if code == TIMING-588-US:  return 588
-    if code == TIMING-1100-US: return 1100
-    if code == TIMING-2100-US: return 2100
-    if code == TIMING-4200-US: return 4200
-    if code == TIMING-8300-US: return 8300
-    return 1100  // default/defensive - should never happen
+    // Using datasheet maximum values, not typical.
+    if code == TIMING-140-US:  return 154
+    if code == TIMING-204-US:  return 224
+    if code == TIMING-332-US:  return 365
+    if code == TIMING-588-US:  return 646
+    if code == TIMING-1100-US: return 1210
+    if code == TIMING-2100-US: return 2328
+    if code == TIMING-4200-US: return 4572
+    if code == TIMING-8300-US: return 9068
+    return 1210
 
   /**
   Returns sampling count for AVERAGE-*-SAMPLE register values.
@@ -621,12 +622,12 @@ class Ina226:
     shunt-conversion-time/int := get-conversion-time-us-from-enum get-shunt-conversion-time
     total-us/int              := (bus-conversion-time + shunt-conversion-time) * sampling-rate
 
-    // Add a small guard factor (~10%) to be conservative.
-    total-us = ((total-us * 11.0) / 10.0).round
+    // Add 25% guard factor.
+    total-us = ((total-us * 5) / 4)
 
-    // Return milliseconds, minimum 1 ms
-    total-ms := ((total-us + 999) / 1000)  // Ceiling.
-    if total-ms < 1: total-ms = 1
+    // Minimum 5ms floor to account for I2C polling overhead (@100khz worst).
+    total-ms := ((total-us + 999) / 1000)
+    if total-ms < 5: total-ms = 5
 
     //logger_.debug "get-estimated-conversion-time-ms:"  --tags={ "get-estimated-conversion-time-ms" : total-ms }
     return total-ms

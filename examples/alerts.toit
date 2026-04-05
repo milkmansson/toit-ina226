@@ -23,8 +23,8 @@ the step
 
 main:
   frequency := 400_000
-  sda := gpio.Pin 26
-  scl := gpio.Pin 25
+  sda := gpio.Pin 19
+  scl := gpio.Pin 20
   bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency
 
   ina226-device := bus.device Ina226.I2C_ADDRESS
@@ -89,5 +89,3 @@ current-state-as-string driver -> string:
   bus-voltage-v/float    := driver.read-bus-voltage
   load-power-mw/float    := driver.read-load-power * 1000.0
   return "Shunt: $(%0.6f shunt-current-a)a  $(%0.3f shunt-voltage-mv)mv  Bus: $(%0.3f bus-voltage-v)v  Power: $(%0.1f load-power-mw)mw"
-
-
