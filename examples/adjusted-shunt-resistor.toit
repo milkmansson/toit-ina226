@@ -20,8 +20,8 @@ Please see the README.md for example Shunt Resistor values.
 
 main:
   // Adjust these to pin numbers in your setup.
-  sda := gpio.Pin 19
-  scl := gpio.Pin 20
+  sda := 19
+  scl := 20
 
   frequency := 400_000
   bus := i2c.Bus --sda=sda --scl=scl --frequency=frequency

@@ -4,7 +4,6 @@
 // work from other authors and sources with permission.  See README.md.
 
 import log
-import binary
 import serial.device as serial
 import serial.registers as registers
 
@@ -30,9 +29,17 @@ class Ina226:
 
   /** 'Power Down' mode - used while configuring $set-measure-mode. */
   static MODE-POWER-DOWN                       ::= 0b000
-  /** 'Triggered' mode - used while configuring $set-measure-mode. */
+  /** 'Shunt voltage only, Triggered' mode - used while configuring $set-measure-mode. */
+  static MODE-SHUNT-TRIGGERED                  ::= 0b001
+  /** 'Bus voltage only, Triggered' mode - used while configuring $set-measure-mode. */
+  static MODE-BUS-TRIGGERED                    ::= 0b010
+  /** 'Shunt voltage only, Continuous' mode - used while configuring $set-measure-mode. */
+  static MODE-SHUNT-CONTINUOUS                 ::= 0b101
+  /** 'Bus voltage only, Continuous' mode - used while configuring $set-measure-mode. */
+  static MODE-BUS-CONTINUOUS                   ::= 0b110
+  /** 'Triggered' mode (shunt and bus) - used while configuring $set-measure-mode. */
   static MODE-TRIGGERED                        ::= 0b011
-  /** 'Continuous' mode - used while configuring $set-measure-mode. */
+  /** 'Continuous' mode (shunt and bus) - used while configuring $set-measure-mode. */
   static MODE-CONTINUOUS                       ::= 0b111
 
   /** Sampling option: (Default) - 1 sample = no averaging. */
@@ -104,6 +111,9 @@ class Ina226:
   static DIE-ID-RID-MASK_                      ::= 0b00000000_00001111
   static DIE-ID-DID-MASK_                      ::= 0b11111111_11110000
 
+  // Texas Instruments manufacturer ID ('TI' in ASCII), from REG-MANUF-ID_.
+  static MANUFACTURER-ID_                      ::= 0x5449
+
   // Actual INA226 device ID field - to identify this chip over INA3221 etc.
   // DIE-ID register (bits [15:4] of 0x2260, after masking and shifting).
   static INA226-DEVICE-ID_                     ::= 0x226
@@ -119,6 +129,7 @@ class Ina226:
   static SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/float ::= 0.0819175  // or 0.08192    // volts.
   static SHUNT-VOLTAGE-LSB_                    ::= 0.0000025  // volts. 2.5 µV/bit.
   static BUS-VOLTAGE-LSB_                      ::= 0.00125    // volts, 1.25 mV/bit
+  static POWER-LSB-MULTIPLIER_                 ::= 25.0       // Power_LSB = 25 * Current_LSB.
 
   // Private variables.
   reg_/registers.Registers := ?
@@ -134,6 +145,7 @@ class Ina226:
       dev/serial.Device
       --shunt-resistor/float=0.100
       --measure-mode=MODE-CONTINUOUS
+      --force/bool=false  // Continue even if the manufacturer ID is not TI's (clones).
       --logger/log.Logger=log.default:
     logger_ = logger.with-name "ina226"
     reg_ = dev.registers
@@ -141,8 +153,13 @@ class Ina226:
 
     dev-id := read-device-identification
     man-id := read-manufacturer-id
-    dev-rev := read-device-revision
 
+    if man-id != MANUFACTURER-ID_:
+      if force:
+        logger_.warn "Unexpected manufacturer ID - continuing (--force)"
+            --tags={ "expected-id" : MANUFACTURER-ID_, "received-id" : man-id }
+      else:
+        throw "Unexpected manufacturer ID. Expected 0x$(%04x MANUFACTURER-ID_) got 0x$(%04x man-id) (use --force to override)"
     if (dev-id != INA226-DEVICE-ID_):
       logger_.error "Device is NOT an INA226" --tags={ "expected-id" : INA226-DEVICE-ID_, "received-id": dev-id }
       throw "Device is not an INA226. Expected 0x$(%04x INA226-DEVICE-ID_) got 0x$(%04x dev-id)"
@@ -150,7 +167,7 @@ class Ina226:
     // Reset first, then configure everything on a clean slate.
     write-register_ REG-CONFIG_ 0b1 --mask=CONF-RESET-MASK_
 
-    set-shunt-resistor_ shunt-resistor_
+    set-shunt-resistor shunt-resistor_
     set-measure-mode measure-mode
     set-sampling-rate AVERAGE-1-SAMPLE
     set-bus-conversion-time TIMING-1100-US
@@ -162,13 +179,15 @@ class Ina226:
   Resets the device.
   */
   reset_ -> none:
+    // Capture the configuration (mode, averaging, conversion times) before the
+    // reset puts everything back to power-on defaults.
+    last-config := reg_.read-u16-be REG-CONFIG_
     write-register_ REG-CONFIG_ 0b1 --mask=CONF-RESET-MASK_
 
-    // If reset is ever called, these are required before registers populate.
-    // If resetting for other reasons, resets to the last configured mode.
-    last-measure-mode := get-measure-mode
-    set-shunt-resistor_ shunt-resistor_
-    set-measure-mode last-measure-mode
+    // The calibration register is cleared by reset, so current and power read
+    // zero until it is programmed again.
+    set-shunt-resistor shunt-resistor_ --max-current=max-current_
+    reg_.write-u16-be REG-CONFIG_ (last-config & ~CONF-RESET-MASK_)
 
   /**
   Gets the current calibration value.
@@ -176,7 +195,7 @@ class Ina226:
   The calibration value scales the raw sensor data so that it corresponds to
     real-world values, taking into account the shunt resistor value, the
     full-scale range, and other system-specific factors. This value is
-    calculated automatically by the $set-shunt-resistor_ method - setting
+    calculated automatically by the $set-shunt-resistor method - setting
     manually is not normally required, and is private.  See Datasheet pp.10.
   */
   get-calibration-value_ -> int:
@@ -265,23 +284,30 @@ class Ina226:
     return read-register_ REG-CONFIG_ --mask=CONF-MODE-MASK_
 
   /**
-  Sets the resistor and current range.  See README.md
+  Sets the shunt resistor value, in ohms, and recalculates calibration.
+
+  The calibration is chosen so the current register covers $max-current (amps)
+    at full scale.  By default this is the current that produces the full-scale
+    shunt voltage (81.92 mV).  A smaller $max-current gives finer current
+    resolution.  See README.md.
   */
-  set-shunt-resistor_ resistor/float --max-current/float=(SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/resistor) -> none:
+  set-shunt-resistor resistor/float --max-current/float=(SHUNT-FULL-SCALE-VOLTAGE-LIMIT_/resistor) -> none:
+    assert: resistor > 0.0
     // Cache to class-wide for later use.
     shunt-resistor_ = resistor
     // Cache to class-wide for later use.
     max-current_ = max-current
-    // Cache LSB of max current selection (amps per bit).
-    current-LSB_ = (max-current_ / 32768.0)
-    // Calculate new calibration value.
-    new-calibration-value  := INTERNAL_SCALING_VALUE_ / (current-LSB_ * resistor)
-    // Set the new calibration value in the IC.
-    set-calibration-value_  (new-calibration-value).round
-    // Cache new current divider LSB
-    //current-divider-ma_    = 0.001 / current-LSB_
-    // Cache new power multiplier/LSB
-    power-LSB_   = 25.0 * current-LSB_
+    // Ideal LSB of max current selection (amps per bit): Max Current / 2^15.
+    ideal-LSB/float := max-current_ / 32768.0
+    // CAL = 0.00512 / (Current_LSB * R_shunt).  Bit 15 of the register is unused.
+    new-calibration-value/int := (INTERNAL_SCALING_VALUE_ / (ideal-LSB * resistor)).round
+    new-calibration-value = clamp-value_ new-calibration-value --lower=1 --upper=0x7FFF
+    set-calibration-value_ new-calibration-value
+    // Rounding changes the LSB slightly, so derive the LSB actually in effect
+    // from the stored calibration value.
+    current-LSB_ = INTERNAL_SCALING_VALUE_ / (new-calibration-value * resistor)
+    // Cache new power multiplier/LSB: Power_LSB = 25 * Current_LSB.
+    power-LSB_   = POWER-LSB-MULTIPLIER_ * current-LSB_
 
   /**
   Returns shunt current in amps.
@@ -334,11 +360,10 @@ class Ina226:
   /**
   Watts used by the load.
 
-  Calculated using the cached multiplier: [power-LSB_ = 1000 * 25 * current-LSB_]
+  Calculated using the cached multiplier: [power-LSB_ = 25 * current-LSB_]
   */
   read-load-power -> float:
     value := reg_.read-u16-be REG-LOAD-POWER_
-    //return (value * power-LSB_).to-float / 1000.0
     return value * power-LSB_
 
   /**
@@ -354,19 +379,6 @@ class Ina226:
       logger_.debug "wait-until-conversion-completed: max-wait-time exceeded - continuing"
           --tags={ "max-wait-time-ms" : max-wait-time-ms }
     clear-alert
-  /*
-  wait-until-conversion-completed --max-wait-time-ms/int=(get-estimated-conversion-time-ms) -> none:
-    current-wait-time-ms/int   := 0
-    sleep-interval-ms/int := (max-wait-time-ms / 10)
-    while (not is-conversion-ready):
-      sleep --ms=sleep-interval-ms
-      current-wait-time-ms += sleep-interval-ms
-      if current-wait-time-ms >= max-wait-time-ms:
-        logger_.debug "wait-until-conversion-completed: max-wait-time exceeded - continuing"
-          --tags={ "max-wait-time-ms" : max-wait-time-ms }
-        break
-    clear-alert
-  */
 
   /**
   Performs a single conversion/measurement.
@@ -397,9 +409,9 @@ class Ina226:
   */
   set-shunt-over-voltage-alert limit/float -> none:
     disable-all-alerts
-    raw-limit/int := (limit / SHUNT-VOLTAGE-LSB_).round
-    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
+    raw-limit/int := clamp-value_ (limit / SHUNT-VOLTAGE-LSB_).round --upper=32767 --lower=-32768
     write-register_ REG-ALERT-LIMIT_ raw-limit
+    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
 
   /**
   Sets shunt 'is under voltage' alert.
@@ -408,9 +420,9 @@ class Ina226:
   */
   set-shunt-under-voltage-alert limit/float -> none:
     disable-all-alerts
-    raw-limit/int := (limit / SHUNT-VOLTAGE-LSB_).round
-    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
+    raw-limit/int := clamp-value_ (limit / SHUNT-VOLTAGE-LSB_).round --upper=32767 --lower=-32768
     write-register_ REG-ALERT-LIMIT_ raw-limit
+    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
 
   /**
   Sets shunt 'is over current' alert by mathing to voltage.
@@ -425,8 +437,8 @@ class Ina226:
       amps = full-scale-current
     raw-limit/int := (amps * shunt-resistor_ / SHUNT-VOLTAGE-LSB_).round
     raw-limit = clamp-value_ raw-limit --upper=32767 --lower=-32768
-    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
     write-register_ REG-ALERT-LIMIT_ raw-limit
+    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
 
   /**
   Sets shunt 'is under current' alert by mathing to voltage.
@@ -437,12 +449,12 @@ class Ina226:
     disable-all-alerts
     full-scale-current := SHUNT-FULL-SCALE-VOLTAGE-LIMIT_ / shunt-resistor_
     if amps > full-scale-current:
-      logger_.warn "set-shunt-over-current-alert: limit $(%0.6f amps) A exceeds full-scale $(%0.6f full-scale-current) A; clamping."
+      logger_.warn "set-shunt-under-current-alert: limit $(%0.6f amps) A exceeds full-scale $(%0.6f full-scale-current) A; clamping."
       amps = full-scale-current
     raw-limit/int := (amps * shunt-resistor_ / SHUNT-VOLTAGE-LSB_).round
     raw-limit = clamp-value_ raw-limit --upper=32767 --lower=-32768
-    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
     write-register_ REG-ALERT-LIMIT_ raw-limit
+    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
 
   /**
   Sets bus 'is over voltage' alert.
@@ -451,9 +463,9 @@ class Ina226:
   */
   set-bus-over-voltage-alert volts/float -> none:
     disable-all-alerts
-    raw-limit/int := (volts / BUS-VOLTAGE-LSB_).round
-    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-BUS-OVER-VOLTAGE_
+    raw-limit/int := clamp-value_ (volts / BUS-VOLTAGE-LSB_).round --upper=32767 --lower=0
     write-register_ REG-ALERT-LIMIT_ raw-limit
+    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-BUS-OVER-VOLTAGE_
 
   /**
   Sets bus 'is under voltage' alert.
@@ -462,9 +474,9 @@ class Ina226:
   */
   set-bus-under-voltage-alert volts/float -> none:
     disable-all-alerts
-    raw-limit/int := (volts / BUS-VOLTAGE-LSB_ ).round
-    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-BUS-UNDER-VOLTAGE_
+    raw-limit/int := clamp-value_ (volts / BUS-VOLTAGE-LSB_).round --upper=32767 --lower=0
     write-register_ REG-ALERT-LIMIT_ raw-limit
+    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-BUS-UNDER-VOLTAGE_
 
   /**
   Sets power 'is over wattage' alert.
@@ -473,10 +485,9 @@ class Ina226:
   */
   set-power-over-alert watts/float -> none:
     disable-all-alerts
-    //raw-limit/int := (limit / power-LSB_).round
-    raw-limit/int := (watts / (25 * current-LSB_)).round
-    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-POWER-OVER_
+    raw-limit/int := clamp-value_ (watts / power-LSB_).round --upper=0xFFFF --lower=0
     write-register_ REG-ALERT-LIMIT_ raw-limit
+    write-register_ REG-MASK-ENABLE_ 1 --mask=ALERT-ENABLE-POWER-OVER_
 
   /**
   Sets 'conversion-ready' alert to use the pin.
@@ -488,13 +499,6 @@ class Ina226:
   /**
   Disables all alerts.  Useful when setting a new alert type.
   */
-  //disable-all-alerts -> none:
-  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
-  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
-  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-OVER-VOLTAGE_
-  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-BUS-UNDER-VOLTAGE_
-  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-POWER-OVER_
-  //  write-register_ REG-MASK-ENABLE_ 0 --mask=ALERT-ENABLE-CONVERSION-READY_
   disable-all-alerts -> none:
     alert-mask := ALERT-ENABLE-SHUNT-OVER-VOLTAGE_
         | ALERT-ENABLE-SHUNT-UNDER-VOLTAGE_
@@ -549,6 +553,10 @@ class Ina226:
   /**
   Returns whether a conversion is complete.
 
+  Note: reading the Mask/Enable register clears the Conversion Ready flag (and,
+    in latch mode, the alert flag).  This, $is-alert-overflow and $is-alert-limit
+    all read it, so calling any of them consumes the flags.
+
   Although the device can be read at any time, and the data from the last
     conversion is available, the Conversion Ready Flag bit is provided to help
     coordinate one-shot or triggered conversions. The Conversion Ready Flag bit
@@ -564,6 +572,9 @@ class Ina226:
 
   /**
   Whether an overflow alert exists.
+
+  Reads the Mask/Enable register, which clears the Conversion Ready flag.  See
+    $is-conversion-ready.
   */
   is-alert-overflow  -> bool:
     raw/int := read-register_ REG-MASK-ENABLE_ --mask=MATH-OVERFLOW-ALERT-FLAG_
@@ -571,6 +582,9 @@ class Ina226:
 
   /**
   Whether the configured alert limits are exceeded.
+
+  Reads the Mask/Enable register, which clears the Conversion Ready flag and, in
+    latch mode, the alert flag.  See $is-conversion-ready.
 
   See README.md.
   */
@@ -676,14 +690,15 @@ class Ina226:
     the whole register.
   */
   write-register_ register/int value/any --mask/int=0xFFFF --offset/int=(mask.count-trailing-zeros) -> none:
-    // find allowed value range within field
-    max/int := mask >> offset
-    // check the value fits the field
-    assert: ((value & ~max) == 0)
-
     if (mask == 0xFFFF) and (offset == 0):
+      // Whole register: allow two's complement values (e.g. negative alert limits).
+      assert: -32768 <= value <= 0xFFFF
       reg_.write-u16-be register (value & 0xFFFF)
     else:
+      // find allowed value range within field
+      max/int := mask >> offset
+      // check the value fits the field
+      assert: ((value & ~max) == 0)
       new-value/int := reg_.read-u16-be register
       new-value     &= ~mask
       new-value     |= (value << offset)
@@ -718,7 +733,7 @@ class Ina226:
 
     calibration-value/int              := get-calibration-value_
     current-raw/int                    := reg_.read-i16-be REG-SHUNT-CURRENT_
-    least-significant-bit/float        := 0.00512 / (calibration-value.to-float * shunt-resistor_)
+    least-significant-bit/float        := INTERNAL_SCALING_VALUE_ / (calibration-value.to-float * shunt-resistor_)
     current-chip/float                 := current-raw * least-significant-bit
     current-v-r/float                  := shunt-voltage / shunt-resistor_
 
@@ -726,7 +741,7 @@ class Ina226:
     current-difference/float           := (current-chip - current-v-r).abs
     current-difference-percent/float   := 0.0
     if (current-v-r != 0.0):
-      current-difference-percent       = (current-difference / current-v-r) * 100.0
+      current-difference-percent       = (current-difference / current-v-r).abs * 100.0
 
     // CROSSCHECK: shunt voltage (measured vs reconstructed).
     shunt-voltage-calculated/float          := current-chip * shunt-resistor_
