@@ -692,7 +692,7 @@ class Ina226:
   write-register_ register/int value/any --mask/int=0xFFFF --offset/int=(mask.count-trailing-zeros) -> none:
     if (mask == 0xFFFF) and (offset == 0):
       // Whole register: allow two's complement values (e.g. negative alert limits).
-      assert: -0x8000 <= value <= 0xFFFF
+      assert: -32768 <= value <= 0xFFFF
       reg_.write-u16-be register (value & 0xFFFF)
     else:
       // find allowed value range within field
